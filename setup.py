@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='rustat-python-api',
-    version='0.1.0',
+    version='0.1.1',
     description='A Python wrapper for RuStat API',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -14,6 +14,7 @@ setup(
     install_requires=[
         'requests==2.32.3',
         'pandas==2.2.3',
+        'tqdm==4.66.5'
     ],
     classifiers=[
         'Programming Language :: Python :: 3',

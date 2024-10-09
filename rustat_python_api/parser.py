@@ -3,7 +3,7 @@ import pandas as pd
 from collections import defaultdict
 from tqdm import tqdm
 
-from urls import URLs
+from .urls import URLs
 
 
 class RuStatParser:
