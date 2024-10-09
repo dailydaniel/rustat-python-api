@@ -1,0 +1,8 @@
+.zed/
+.venv/
+pyrightconfig.json
+tests/.env
+build/
+dist/
+rustat_python_api.egg-info/
+rustat_python_api/__pycache__/
