@@ -2,12 +2,19 @@ import requests
 import pandas as pd
 from collections import defaultdict
 from tqdm import tqdm
+import time
 
 from .urls import URLs
 
 
 class RuStatParser:
-    def __init__(self, user: str, password: str, urls: dict = URLs):
+    def __init__(
+        self,
+        user: str,
+        password: str,
+        urls: dict = URLs,
+        sleep: int = -1
+    ):
         self.numeric_columns = [
             'id', 'number', 'player_id', 'team_id', 'half', 'second',
             'pos_x', 'pos_y', 'pos_dest_x', 'pos_dest_y', 'len', 'possession_id', 'possession_team_id',
@@ -18,11 +25,15 @@ class RuStatParser:
         self.user = user
         self.password = password
         self.urls = urls
+        self.sleep = sleep
 
         self.cached_info = {}
 
-    @staticmethod
-    def resp2data(query: str) -> dict:
+    def resp2data(self, query: str) -> dict:
+
+        if self.sleep > 0:
+            time.sleep(self.sleep)
+
         response = requests.get(query)
         return response.json()
 

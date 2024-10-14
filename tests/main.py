@@ -8,8 +8,8 @@ sys.path.append('../')
 from rustat_python_api import RuStatParser
 
 
-def test_info(user: str, password: str):
-    parser = RuStatParser(user, password)
+def test_info(user: str, password: str, sleep: float = 0.25):
+    parser = RuStatParser(user, password, sleep=sleep)
     info = parser.get_rpl_info()
     keys = list(info.keys())
     print(keys)
@@ -55,10 +55,11 @@ if __name__ == "__main__":
 
     user = os.getenv('USER')
     password = os.getenv('PASSWORD')
+    sleep = 0.25
 
     print(user, password)
 
-    season_id, team_id = test_info(user, password)
+    season_id, team_id = test_info(user, password, sleep=sleep)
     match_id = test_schedule(user, password, team_id, season_id)
     test_events(user, password, match_id)
     test_stats(user, password, match_id)
