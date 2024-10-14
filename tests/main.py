@@ -3,9 +3,10 @@ import os
 from dotenv import load_dotenv
 
 import sys
-sys.path.append('../rustat_python_api')
+sys.path.append('../')
 
-from parser import RuStatParser
+from rustat_python_api import RuStatParser
+
 
 def test_info(user: str, password: str):
     parser = RuStatParser(user, password)
@@ -41,6 +42,13 @@ def test_stats(user: str, password: str, match_id: str):
     print(keys)
     print(stats[keys[-1]])
 
+def test_tracking(user: str, password: str, match_id: str):
+    parser = RuStatParser(user, password)
+    tracking = parser.get_tracking(match_id)
+
+    print(tracking.describe())
+    print(tracking["player_name"].unique())
+
 
 if __name__ == "__main__":
     load_dotenv(dotenv_path='.env')
@@ -48,7 +56,10 @@ if __name__ == "__main__":
     user = os.getenv('USER')
     password = os.getenv('PASSWORD')
 
+    print(user, password)
+
     season_id, team_id = test_info(user, password)
     match_id = test_schedule(user, password, team_id, season_id)
     test_events(user, password, match_id)
     test_stats(user, password, match_id)
+    test_tracking(user, password, match_id)

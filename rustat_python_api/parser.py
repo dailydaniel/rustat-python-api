@@ -7,7 +7,7 @@ from .urls import URLs
 
 
 class RuStatParser:
-    def __init__(self, user: str, password: str):
+    def __init__(self, user: str, password: str, urls: dict = URLs):
         self.numeric_columns = [
             'id', 'number', 'player_id', 'team_id', 'half', 'second',
             'pos_x', 'pos_y', 'pos_dest_x', 'pos_dest_y', 'len', 'possession_id', 'possession_team_id',
@@ -17,6 +17,7 @@ class RuStatParser:
 
         self.user = user
         self.password = password
+        self.urls = urls
 
         self.cached_info = {}
 
@@ -28,7 +29,7 @@ class RuStatParser:
     def get_rpl_info(self):
         for season_id in tqdm(range(1, 36)):
             data = self.resp2data(
-                URLs["tournament_teams"].format(
+                self.urls["tournament_teams"].format(
                     user=self.user,
                     password=self.password,
                     season_id=season_id
@@ -38,7 +39,7 @@ class RuStatParser:
             if data:
                 first_team_id = data["data"]["row"][0]["id"]
                 first_team_schedule = self.resp2data(
-                    URLs["schedule"].format(
+                    self.urls["schedule"].format(
                         user=self.user,
                         password=self.password,
                         team_id=first_team_id,
@@ -61,7 +62,7 @@ class RuStatParser:
 
     def get_schedule(self, team_id: str, season_id: str) -> dict:
         data = self.resp2data(
-            URLs["schedule"].format(
+            self.urls["schedule"].format(
                 user=self.user,
                 password=self.password,
                 team_id=team_id,
@@ -85,7 +86,7 @@ class RuStatParser:
 
     def get_events(self, match_id: int) -> pd.DataFrame | None:
         data = self.resp2data(
-            URLs["events"].format(
+            self.urls["events"].format(
                 user=self.user,
                 password=self.password,
                 match_id=match_id
@@ -102,9 +103,43 @@ class RuStatParser:
 
         return df
 
+    def get_tracking(self, match_id: int) -> pd.DataFrame | None:
+        data = self.resp2data(
+            self.urls["tracking"].format(
+                user=self.user,
+                password=self.password,
+                match_id=match_id
+            )
+        )
+
+        if not data:
+            return None
+
+        data = data["data"]["team"]
+        df = pd.DataFrame(columns=["half", "second", "pos_x", "pos_y", "team_id", "player_id", "player_name", "side_1h"])
+
+        for team_data in tqdm(data):
+            team_id = team_data["id"]
+            side_1h = team_data["gate_position_half_1"]
+
+            for player_data in team_data["player"]:
+                player_id = player_data["id"]
+                player_name = player_data["name"]
+
+                cur_df = pd.json_normalize(player_data["row"])
+                cur_df = cur_df.apply(pd.to_numeric, errors='coerce')
+                cur_df["team_id"] = team_id
+                cur_df["player_id"] = player_id
+                cur_df["player_name"] = player_name
+                cur_df["side_1h"] = side_1h
+
+                df = pd.concat([df, cur_df], ignore_index=True)
+
+        return df.sort_values(by=["second", "team_id", "player_id"])
+
     def get_match_stats(self, match_id: int) -> dict:
         data = self.resp2data(
-            URLs["match_stats"].format(
+            self.urls["match_stats"].format(
                 user=self.user,
                 password=self.password,
                 match_id=match_id

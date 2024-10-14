@@ -26,4 +26,6 @@ match_id = keys[-1]
 events = parser.get_events(match_id)
 
 stats = parser.get_match_stats(match_id)
+
+tracking = parser.get_tracking(match_id)
 ```
