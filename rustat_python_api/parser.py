@@ -5,6 +5,7 @@ from tqdm import tqdm
 import time
 
 from .urls import URLs
+from .processing import processing
 
 
 class RuStatParser:
@@ -95,7 +96,7 @@ class RuStatParser:
             for row in data["data"]["row"]
         }
 
-    def get_events(self, match_id: int) -> pd.DataFrame | None:
+    def get_events(self, match_id: int, process: bool = True) -> pd.DataFrame | None:
         data = self.resp2data(
             self.urls["events"].format(
                 user=self.user,
@@ -111,6 +112,10 @@ class RuStatParser:
 
         numeric_columns = [column for column in self.numeric_columns if column in df.columns]
         df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
+
+        if process:
+            df['match_id'] = match_id
+            df = processing(df)
 
         return df
 
