@@ -5,6 +5,7 @@ from tqdm import tqdm
 import time
 
 from .urls import URLs
+from .config import numeric_columns
 from .processing import processing
 
 
@@ -16,13 +17,6 @@ class RuStatParser:
         urls: dict = URLs,
         sleep: int = -1
     ):
-        self.numeric_columns = [
-            'id', 'number', 'player_id', 'team_id', 'half', 'second',
-            'pos_x', 'pos_y', 'pos_dest_x', 'pos_dest_y', 'len', 'possession_id', 'possession_team_id',
-            'opponent_id', 'opponent_team_id', 'zone_id', 'zone_dest_id',
-            'possession_number', 'attack_status_id', 'attack_team_id', 'assistant_id', 'touches', 'xg'
-        ]
-
         self.user = user
         self.password = password
         self.urls = urls
@@ -110,8 +104,8 @@ class RuStatParser:
 
         df = pd.json_normalize(data["data"]["row"])
 
-        numeric_columns = [column for column in self.numeric_columns if column in df.columns]
-        df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
+        current_numeric_columns = [column for column in numeric_columns if column in df.columns]
+        df[current_numeric_columns] = df[current_numeric_columns].apply(pd.to_numeric, errors='coerce')
 
         if process:
             df['match_id'] = match_id

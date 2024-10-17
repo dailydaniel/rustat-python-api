@@ -1,10 +1,11 @@
 import pandas as pd
 import numpy as np
 
+from .config import columns, id2type
+
 
 def process_list(x: pd.Series):
     lst = x.dropna().unique().tolist()
-    # return str(lst)
     if len(lst) == 1:
         return lst[0]
     elif len(lst) == 0:
@@ -50,20 +51,6 @@ def add_reciever(glued_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def filter_data(df: pd.DataFrame) -> pd.DataFrame:
-    columns = [
-        'player_name', 'team_name', 'half', 'second', 'action_name',
-        'position_name', 'possession_number', 'pos_x', 'pos_y', 'pos_dest_x', 'pos_dest_y',
-        'player_id', 'number', 'team_id', 'standart_name', 'possession_time',
-        'opponent_id', 'opponent_name', 'opponent_team_id', 'opponent_team_name',
-        'opponent_position_name', 'zone_name', 'zone_dest_name', 'len',
-        'possession_team_id', 'possession_team_name', 'possession_name',
-        'attack_status_name', 'attack_type_name', 'attack_flang_name',
-        'attack_team_id', 'attack_team_name', 'attack_number',
-        'body_name', 'gate_x', 'gate_y', 'assistant_id',
-        'assistant_name', 'shot_type', 'touches', 'xg',
-        'shot_handling', 'match_id', 'receiver_id', 'receiver_name'
-    ]
-
     for column in columns:
         if column not in df.columns:
             df[column] = np.nan
@@ -71,83 +58,17 @@ def filter_data(df: pd.DataFrame) -> pd.DataFrame:
     return df[(~df['possession_number'].isna()) | (df['second'] != 0)][columns].reset_index(drop=True)
 
 
-def tag2type(tags: list[str]) -> str:
-    tags = [tag.lower() for tag in tags]
-    tags_str = ', '.join(tags)
-
-    if 'pass' in tags_str or 'assist' in tags_str:
-        pass_tags = [tag for tag in tags if 'pass' in tag and tag != 'pass interception']
-        assist_tags = [tag for tag in tags if 'assist' in tag]
-        cross_tags = [tag for tag in tags if 'cross' in tag and tag != 'cross interception']
-
-        if len(pass_tags) > 0 or (len(assist_tags) > 0 and len(cross_tags) == 0):
-            return 'pass'
-
-    if 'cross' in tags_str:
-        cross_tags = [tag for tag in tags if 'cross' in tag and tag != 'cross interception']
-        pass_tags = [tag for tag in tags if 'pass' in tag and tag != 'pass interception']
-        assist_tags = [tag for tag in tags if 'assist' in tag]
-
-        if len(cross_tags) > 0 or (len(assist_tags) > 0 and len(pass_tags) == 0):
-            return 'cross'
-
-    if 'shot' in tags_str:
-        shot_tags = [
-            tag for tag in tags
-            if 'shot' in tag and tag != 'shot interception' and 'with a shot' not in tag
-        ]
-
-        if len(shot_tags) > 0:
-            return 'shot'
-
-    if 'dribbl' in tags_str:
-        return 'dribble'
-
-    if 'interception' in tags_str:
-        return 'interception'
-
-    if 'tackle' in tags_str:
-        return 'tackle'
-
-    if 'clearance' in tags_str:
-        return 'clearance'
-
-    if 'lost ball' in tags_str or 'bad ball control' in tags_str or 'mistake' in tags_str:
-        return 'lost ball'
-
-    if 'recovery' in tags_str:
-        return 'recovery'
-
-    if 'rebound' in tags_str:
-        return 'rebound'
-
-    if 'foul' in tags_str or 'yc, ' in tags_str or 'rc, ' in tags_str or 'rc for 2 yc' in tags_str or 'yc' == tags_str or 'rc' == tags_str:
-        return 'foul'
-
-    if 'challenge' in tags_str:
-        return 'challenge'
-
-    if 'own goal' in tags_str:
-        return 'own goal'
-
-    if 'save' in tags_str:
-        return 'save'
-
-    if 'chance created' in tags_str or 'goal' in tags_str or 'goal-scoring moment' in tags_str:
-        goal_tags = [tag for tag in tags if 'goal' == tag or 'goal-scoring moment' in tag or 'chance created' in tag]
-        if len(goal_tags) > 0:
-            return 'chance'
-
-    if 'opening' in tags_str:
-        return 'opening'
-
-    return 'other'
-
-
 def tagging(df: pd.DataFrame) -> pd.DataFrame:
-    df = df.rename(columns={'action_name': 'tags'})
-    df['tags'] = df['tags'].apply(lambda x: x if isinstance(x, list) else [x])
-    df['action_type'] = df['tags'].apply(tag2type)
+    df = df.rename(columns={'action_name': 'sub_tags', 'action_id': 'sub_tags_ids'})
+    df['sub_tags'] = df['sub_tags'].apply(lambda x: x if isinstance(x, list) else [x])
+    df['sub_tags_ids'] = df['sub_tags_ids'].apply(
+        lambda x:
+        list(set([int(t) // 1000 for t in x]))
+        if isinstance(x, list)
+        else [int(x) // 1000]
+    )
+    df['sub_tags_ids'] = df['sub_tags_ids'].apply(lambda x: [id2type[t] for t in x])
+    df = df.rename(columns={'sub_tags_ids': 'tags'})
 
     return df
 
