@@ -27,16 +27,16 @@ def gluing(df: pd.DataFrame) -> pd.DataFrame:
 
 def add_reciever(glued_df: pd.DataFrame) -> pd.DataFrame:
     df = glued_df.copy()
-    df['receiver_id'] = df['player_id'].shift(1)
-    df['receiver_name'] = df['player_name'].shift(1)
+    df['receiver_id'] = df['player_id'].shift(-1)
+    df['receiver_name'] = df['player_name'].shift(-1)
 
     mask = (
             (df['action_name'] == 'Ball receiving')
-            & (df['pos_x'] == df['pos_dest_x'].shift(1))
-            & (df['pos_y'] == df['pos_dest_y'].shift(1))
-            & (df['team_id'] == df['team_id'].shift(1))
-            & (df['player_id'] != df['player_id'].shift(1))
-            & (df['possession_number'] == df['possession_number'].shift(1))
+            & (df['pos_x'] == df['pos_dest_x'].shift(-1))
+            & (df['pos_y'] == df['pos_dest_y'].shift(-1))
+            & (df['team_id'] == df['team_id'].shift(-1))
+            & (df['player_id'] != df['player_id'].shift(-1))
+            & (df['possession_number'] == df['possession_number'].shift(-1))
     )
 
     idx = df[mask].index
