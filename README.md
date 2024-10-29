@@ -23,7 +23,7 @@ schedule = parser.get_schedule(team_id, season_id)
 keys = list(schedule.keys())
 match_id = keys[-1]
 
-events = parser.get_events(match_id, process=True)
+events, subs = parser.get_events(match_id, process=True, return_subs=True)
 
 stats = parser.get_match_stats(match_id)
 

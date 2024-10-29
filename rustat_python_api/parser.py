@@ -90,7 +90,12 @@ class RuStatParser:
             for row in data["data"]["row"]
         }
 
-    def get_events(self, match_id: int, process: bool = True) -> pd.DataFrame | None:
+    def get_events(
+        self,
+        match_id: int,
+        process: bool = True,
+        return_subs: bool = False
+    ) -> pd.DataFrame | None | tuple[pd.DataFrame, pd.DataFrame]:
         data = self.resp2data(
             self.urls["events"].format(
                 user=self.user,
@@ -109,9 +114,23 @@ class RuStatParser:
 
         if process:
             df['match_id'] = match_id
+
+            if return_subs:
+                subs = df[df['action_id'] == '14000'][[
+                    'match_id', 'half', 'second',
+                    'team_id', 'team_name',
+                    'opponent_id', 'opponent_name',
+                    'player_id', 'player_name'
+                ]].rename(columns={
+                    'player_id': 'player_id_out',
+                    'opponent_id': 'player_id_in',
+                    'player_name': 'player_name_out',
+                    'opponent_name': 'player_name_in'
+                })
+
             df = processing(df)
 
-        return df
+        return df, subs if return_subs else df
 
     def get_tracking(self, match_id: int) -> pd.DataFrame | None:
         data = self.resp2data(
