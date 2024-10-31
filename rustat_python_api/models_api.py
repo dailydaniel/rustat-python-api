@@ -42,10 +42,10 @@ class DynamoLab:
             if inplace_column is None:
                 raise ValueError("inplace_column must be specified if inplace is True")
             if inplace:
-                data[inplace_column] = response.json()["prediction"]
-            if df:
+                data[inplace_column] = np.array(response.json()["prediction"])
+            else:
                 df = data.copy()
-                df[inplace_column] = response.json()["prediction"]
+                df[inplace_column] = np.array(response.json()["prediction"])
                 return df
 
         if return_type == "json":
