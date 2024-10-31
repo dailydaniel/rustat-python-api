@@ -47,12 +47,12 @@ class DynamoLab:
                 df = data.copy()
                 df[inplace_column] = np.array(response.json()["prediction"])
                 return df
-
-        if return_type == "json":
-            return response.json()
-        elif return_type == "list":
-            return response.json()["prediction"]
-        elif return_type == "numpy":
-            return np.array(response.json()["prediction"])
         else:
-            raise ValueError("return_type must be one of: json, list, numpy")
+            if return_type == "json":
+                return response.json()
+            elif return_type == "list":
+                return response.json()["prediction"]
+            elif return_type == "numpy":
+                return np.array(response.json()["prediction"])
+            else:
+                raise ValueError("return_type must be one of: json, list, numpy")
