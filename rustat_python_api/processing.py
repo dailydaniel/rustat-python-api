@@ -21,7 +21,8 @@ def gluing(df: pd.DataFrame) -> pd.DataFrame:
     df_gb['possession_number'] = df_gb['possession_number'].apply(
         lambda x: max(x) if isinstance(x, list) else x
     )
-    df_gb = df_gb.sort_values(by=['half', 'second', 'possession_number']).reset_index(drop=True)
+    df_gb['pos_dest_nan'] = (df_gb['pos_dest_x'].isna() & df_gb['pos_dest_y'].isna()).astype(int)
+    df_gb = df_gb.sort_values(by=['half', 'second', 'possession_number', 'pos_dest_nan']).reset_index(drop=True)
     return df_gb
 
 
