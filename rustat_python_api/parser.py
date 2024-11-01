@@ -85,7 +85,10 @@ class RuStatParser:
                 "team1_id": int(row["team1_id"]),
                 "team2_id": int(row["team2_id"]),
                 "team1_name": row["team1_name"],
-                "team2_name": row["team2_name"]
+                "team2_name": row["team2_name"],
+                "round_name": (row["round_name"] if "round_name" in row else None),
+                "tournament_name": (row["tournament_name"] if "tournament_name" in row else None),
+                "season_name": (row["season_name"] if "season_name" in row else None)
             }
             for row in data["data"]["row"]
         }

@@ -61,6 +61,7 @@ if __name__ == "__main__":
 
     season_id, team_id = test_info(user, password, sleep=sleep)
     match_id = test_schedule(user, password, team_id, season_id)
-    test_events(user, password, match_id)
+
+    # test_events(user, password, match_id)
     # test_stats(user, password, match_id)
     # test_tracking(user, password, match_id)
