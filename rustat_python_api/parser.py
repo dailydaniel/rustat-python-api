@@ -219,7 +219,8 @@ class RuStatParser:
             for player_data in team_data['player']:
                 player_id = int(player_data['id'])
 
-                minutes = [float(metric['value']) for metric in player_data['param'] if metric['id'] == '288'][0]
+                minutes = [float(metric['value']) for metric in player_data['param'] if metric['id'] == '288']
+                minutes = minutes[0] if minutes else 0
 
                 players_minutes[player_id] = minutes
 
