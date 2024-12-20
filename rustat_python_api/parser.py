@@ -205,4 +205,4 @@ class RuStatParser:
         if not data:
             return {}
 
-        return data['team'] if 'team' in data else {}
+        return data['data']['team']
