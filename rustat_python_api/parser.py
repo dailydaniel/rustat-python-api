@@ -192,3 +192,17 @@ class RuStatParser:
             stats[param_name][team_id] = param_value
 
         return stats
+
+    def get_players_match_stats(self, match_id: int) -> dict:
+        data = self.resp2data(
+            self.urls["player_match_stats"].format(
+                user=self.user,
+                password=self.password,
+                match_id=match_id
+            )
+        )
+
+        if not data:
+            return {}
+
+        return data['team'] if 'team' in data else {}
