@@ -97,7 +97,7 @@ class RuStatParser:
         self,
         match_id: int,
         process: bool = True,
-        return_subs: bool = False
+        return_subs: bool = True
     ) -> pd.DataFrame | None | tuple[pd.DataFrame, pd.DataFrame]:
         data = self.resp2data(
             self.urls["events"].format(
@@ -133,7 +133,7 @@ class RuStatParser:
 
             df = processing(df)
 
-        return df, subs if return_subs else df
+        return (df, subs) if return_subs else df
 
     def get_tracking(self, match_id: int) -> pd.DataFrame | None:
         data = self.resp2data(
@@ -206,3 +206,21 @@ class RuStatParser:
             return {}
 
         return data['data']['team']
+
+    def get_players_minutes_in_match(self, match_id: int) -> dict:
+        data = self.get_players_match_stats(match_id)
+
+        if not data:
+            return {}
+
+        players_minutes = {}
+
+        for team_data in data:
+            for player_data in team_data['player']:
+                player_id = int(player_data['id'])
+
+                minutes = [float(metric['value']) for metric in player_data['param'] if metric['id'] == '288'][0]
+
+                players_minutes[player_id] = minutes
+
+        return players_minutes
