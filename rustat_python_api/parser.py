@@ -167,7 +167,11 @@ class RuStatParser:
 
                 df = pd.concat([df, cur_df], ignore_index=True)
 
-        return df.sort_values(by=["second", "team_id", "player_id"])
+        df = df.sort_values(by=['half', 'second', 'team_id', 'player_id']).reset_index(drop=True)
+        df['pos_x'] = df['pos_x'] + 105/2
+        df['second'] = df['second'].astype(int)
+
+        return df
 
     def get_match_stats(self, match_id: int) -> dict:
         data = self.resp2data(

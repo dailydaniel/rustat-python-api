@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='rustat-python-api',
-    version='0.4.12',
+    version='0.5.0',
     description='A Python wrapper for RuStat API',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -14,7 +14,10 @@ setup(
     install_requires=[
         'requests==2.32.3',
         'pandas==2.2.3',
-        'tqdm==4.66.5'
+        'tqdm==4.66.5',
+        'scipy==1.14.1',
+        'matplotlib',
+        'matplotsoccer'
     ],
     classifiers=[
         'Programming Language :: Python :: 3',
