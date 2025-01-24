@@ -266,7 +266,7 @@ class PitchControl:
 
         def animate(i):
             fr = tp + i
-            pitch_control, xx, yy = self.fit(half, tp, dt)
+            pitch_control, xx, yy = self.fit(half, fr, dt)
 
             mpl.field("white", show=False, ax=ax)
             ax.axis('off')
