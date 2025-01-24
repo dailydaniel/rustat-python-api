@@ -45,7 +45,7 @@ class PitchControl:
 
         locs_home = {
             half: {
-                player_id: self.get_player_data(player_id, half=half)
+                player_id: self.get_player_data(player_id, half, tracking)
                 for player_id in tracking[tracking['side_1h'] == 'left']['player_id'].unique()
             }
             for half in tracking['half'].unique()
@@ -53,7 +53,7 @@ class PitchControl:
 
         locs_away = {
             half: {
-                player_id: self.get_player_data(player_id, half=half)
+                player_id: self.get_player_data(player_id, half, tracking)
                 for player_id in tracking[tracking['side_1h'] == 'right']['player_id'].unique()
             }
             for half in tracking['half'].unique()
@@ -213,7 +213,8 @@ class PitchControl:
         tp: int,
         pitch_control: tuple = None,
         save: bool = False,
-        dt: int = 200
+        dt: int = 200,
+        filename: str = 'pitch_control'
     ):
         if pitch_control is None:
             pitch_control, xx, yy = self.fit(half, tp, dt)
@@ -245,7 +246,7 @@ class PitchControl:
         )
 
         if save:
-            plt.savefig('pitch_control.png', dpi=300)
+            plt.savefig(f'{filename}.png', dpi=300)
         else:
             plt.show()
 
@@ -253,7 +254,7 @@ class PitchControl:
         self,
         half: int,
         tp: int,
-        filename: str,
+        filename: str = "pitch_control_animation",
         dt: int = 200,
         frames: int = 30,
         interval: int = 1000

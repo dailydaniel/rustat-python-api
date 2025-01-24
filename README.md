@@ -8,7 +8,7 @@ pip install rustat-python-api
 ```
 1. Usage:
 ```python
-from rustat_python_api import RuStatParser
+from rustat_python_api import RuStatParser, DynamoLab, PitchControl
 
 user = "your_login"
 password = "your_password"
@@ -24,8 +24,20 @@ keys = list(schedule.keys())
 match_id = keys[-1]
 
 events, subs = parser.get_events(match_id, process=True, return_subs=True)
-
 stats = parser.get_match_stats(match_id)
-
 tracking = parser.get_tracking(match_id)
+
+host = "http://localhost:8001/"
+client = DynamoLab(host)
+client.run_model(
+    model="xT",
+    data=events,
+    inplace=True,
+    inplace_column=model
+)
+
+pc = PitchControl(tracking, events)
+pc.draw_pitch_control(half=1, tp=100, save=True, filename="pitch_control")
+# ffmpeg required for animation
+pc.animate_pitch_control(half=1, tp=100, frames=30, filename="pitch_control")
 ```
