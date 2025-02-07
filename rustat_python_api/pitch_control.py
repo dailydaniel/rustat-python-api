@@ -124,10 +124,21 @@ class PitchControl:
 
     @staticmethod
     def get_player_data(player_id, half, tracking):
-        return tracking[
+        timestamps = tracking[tracking['half'] == half]['second'].unique()
+        player_data = tracking[
             (tracking['player_id'] == player_id)
             & (tracking['half'] == half)
-            ][['pos_x', 'pos_y']].values
+        ][['second', 'pos_x', 'pos_y']]
+
+        player_data_full = pd.DataFrame({'second': timestamps})
+        player_data_full = player_data_full.merge(player_data, on='second', how='left')
+
+        return player_data_full[['pos_x', 'pos_y']].values
+
+        # return tracking[
+        #     (tracking['player_id'] == player_id)
+        #     & (tracking['half'] == half)
+        #     ][['pos_x', 'pos_y']].values
 
     def influence_function(
         self,
@@ -195,11 +206,11 @@ class PitchControl:
         locations = np.c_[xx.flatten(),yy.flatten()]
 
         for k in self.locs_home[half].keys():
-            if len(self.locs_home[half][k]) >= tp:
-                Zh += self.influence_function(k, locations, tp, 'h', half)
+            # if len(self.locs_home[half][k]) >= tp:
+            Zh += self.influence_function(k, locations, tp, 'h', half)
         for k in self.locs_away[half].keys():
-            if len(self.locs_away[half][k]) >= tp:
-                Za += self.influence_function(k, locations, tp, 'a', half)
+            # if len(self.locs_away[half][k]) >= tp:
+            Za += self.influence_function(k, locations, tp, 'a', half)
 
         Zh = Zh.reshape((dt, dt))
         Za = Za.reshape((dt, dt))
@@ -225,7 +236,8 @@ class PitchControl:
         plt.contourf(xx, yy, pitch_control)
 
         for k in self.locs_home[half].keys():
-            if len(self.locs_home[half][k]) >= tp:
+            # if len(self.locs_home[half][k]) >= tp:
+            if np.isfinite(self.locs_home[half][k][tp, :]).all():
                 plt.scatter(
                     self.locs_home[half][k][tp, 0],
                     self.locs_home[half][k][tp, 1],
@@ -233,7 +245,8 @@ class PitchControl:
                 )
 
         for k in self.locs_away[half].keys():
-            if len(self.locs_away[half][k]) >= tp:
+            # if len(self.locs_away[half][k]) >= tp:
+            if np.isfinite(self.locs_away[half][k][tp, :]).all():
                 plt.scatter(
                     self.locs_away[half][k][tp, 0],
                     self.locs_away[half][k][tp, 1], color='black'
@@ -274,14 +287,16 @@ class PitchControl:
             plt.contourf(xx, yy, pitch_control)
 
             for k in self.locs_home[half].keys():
-                if len(self.locs_home[half][k]) >= fr:
+                # if len(self.locs_home[half][k]) >= fr:
+                if np.isfinite(self.locs_home[half][k][fr, :]).all():
                     plt.scatter(
                         self.locs_home[half][k][fr, 0],
                         self.locs_home[half][k][fr, 1],
                         color='darkgrey'
                     )
             for k in self.locs_away[half].keys():
-                if len(self.locs_away[half][k]) >= fr:
+                # if len(self.locs_away[half][k]) >= fr:
+                if np.isfinite(self.locs_away[half][k][fr, :]).all():
                     plt.scatter(
                         self.locs_away[half][k][fr, 0],
                         self.locs_away[half][k][fr, 1],
