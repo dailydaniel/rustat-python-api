@@ -4,5 +4,6 @@ URLs = {
     "match_stats": "http://feeds.rustatsport.ru/?tpl=207&user={user}&key={password}&match_id={match_id}&lang_id=1&format=json",
     "tournament_teams": "http://feeds.rustatsport.ru/?tpl=32&user={user}&key={password}&tournament_id=2&season_id={season_id}&date_start=&date_end=&lang_id=1&format=json",
     "tracking": "https://feeds.rustatsport.ru/?tpl=274&user={user}&key={password}&match_id={match_id}&lang_id=0&format=json",
+    "tracking_30fps": "https://feeds.rustatsport.ru/?tpl=1013&user={user}&key={password}&match_id={match_id}&referee_data={referee_data}&ball_data={ball_data}&half={half}&lang_id={lang_id}&format=json",
     "player_match_stats": "http://feeds.rustatsport.ru/?tpl=227&user={user}&key={password}&match_id={match_id}&lang_id=1&format=json"
 }

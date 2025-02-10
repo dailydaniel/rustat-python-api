@@ -7,7 +7,7 @@ import matplotsoccer as mpl
 
 
 class PitchControl:
-    def __init__(self, tracking: pd.DataFrame, events: pd.DataFrame):
+    def __init__(self, tracking: pd.DataFrame, events: pd.DataFrame, ball_data: pd.DataFrame = None):
         self.team_ids = tracking['team_id'].unique()
         sides = tracking.groupby('team_id')['side_1h'].unique()
         side_by_team = dict(zip(self.team_ids, sides[self.team_ids].apply(lambda x: x[0])))
@@ -22,10 +22,11 @@ class PitchControl:
 
         self.locs_home, self.locs_away, self.locs_ball, self.t = self.get_locs(
             tracking,
-            events
+            events,
+            ball_data
         )
 
-    def get_locs(self, tracking: pd.DataFrame, events: pd.DataFrame) -> tuple:
+    def get_locs(self, tracking: pd.DataFrame, events: pd.DataFrame, ball_data: pd.DataFrame | None) -> tuple:
         events = events[[
             'possession_number', 'team_id', 'possession_team_id',
             'half', 'second', 'pos_x', 'pos_y'
@@ -38,10 +39,11 @@ class PitchControl:
             lambda x: self.swap_coords(x, 'y'), axis=1
         )
 
-        ball_data = self.interpolate_ball_data(
-            events[['half', 'second', 'pos_x', 'pos_y']],
-            tracking
-        )
+        if ball_data is None:
+            ball_data = self.interpolate_ball_data(
+                events[['half', 'second', 'pos_x', 'pos_y']],
+                tracking
+            )
 
         locs_home = {
             half: {

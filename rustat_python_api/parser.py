@@ -173,6 +173,80 @@ class RuStatParser:
 
         return df
 
+    def get_tracking_30fps(
+        self,
+        match_id: int, half: int, lang_id: int = 0,
+        referee_data: int = 0, ball_data: int = 1
+    ) -> pd.DataFrame | tuple | None:
+        data = self.resp2data(
+            self.urls["tracking_30fps"].format(
+                user=self.user,
+                password=self.password,
+                match_id=match_id,
+                half=half,
+                lang_id=lang_id,
+                referee_data=referee_data,
+                ball_data=ball_data
+            )
+        )
+
+        if not data:
+            return None
+
+        teams_data = data['data']['teams']
+        if 'ball' in data['data']:
+            ball_data = data['data']['ball']
+        if 'referee' in data['data']:
+            referee_data = data['data']['referee']
+        del data
+
+        tracking = pd.DataFrame(columns=[
+            "half", "second", "pos_x", "pos_y", "team_id", "player_id", "player_name", "distance", "speed"
+        ])
+
+        for team_data in tqdm(teams_data):
+            team_id = team_data["id"]
+            side_1h = team_data["gate_position_half_1"]
+
+            for player_data in team_data["players"]:
+                player_id = player_data["id"]
+                player_name = player_data["name"]
+
+                cur_df = pd.json_normalize(player_data["rows"])
+                cur_df = cur_df.apply(pd.to_numeric, errors='coerce')
+                cur_df["team_id"] = team_id
+                cur_df["player_id"] = player_id
+                cur_df["player_name"] = player_name
+                cur_df["side_1h"] = side_1h
+
+                tracking = pd.concat([tracking, cur_df], ignore_index=True)
+
+        tracking['second'] = tracking['second'].astype(float)
+        tracking = tracking.sort_values(by=['half', 'second', 'team_id', 'player_id']).reset_index(drop=True)
+        tracking['pos_x'] = tracking['pos_x'] + 105/2
+        tracking['team_id'] = tracking['team_id'].astype(str)
+
+        if referee_data:
+            referee = pd.json_normalize(referee_data['rows'])
+            referee['second'] = referee['second'].astype(float)
+            referee = referee.sort_values(by=['half', 'second']).reset_index(drop=True)
+            referee['pos_x'] = referee['pos_x'] + 105/2
+
+        if ball_data:
+            ball = pd.json_normalize(ball_data['rows'])
+            ball['second'] = ball['second'].astype(float)
+            ball = ball.sort_values(by=['half', 'second']).reset_index(drop=True)
+            ball['pos_x'] = ball['pos_x'] + 105/2
+
+        if referee_data and ball_data:
+            return tracking, referee, ball
+        elif referee_data:
+            return tracking, referee
+        elif ball_data:
+            return tracking, ball
+        else:
+            return tracking
+
     def get_match_stats(self, match_id: int) -> dict:
         data = self.resp2data(
             self.urls["match_stats"].format(
