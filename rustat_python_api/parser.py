@@ -175,7 +175,7 @@ class RuStatParser:
 
     def get_tracking_30fps(
         self,
-        match_id: int, half: int, lang_id: int = 0,
+        match_id: int, half: int, lang_id: int = 1,
         referee_data: int = 0, ball_data: int = 1
     ) -> pd.DataFrame | tuple | None:
         data = self.resp2data(
