@@ -67,7 +67,7 @@ class PitchControl:
         }
 
         t = {
-            half: ball_data[ball_data['half'] == 1]['second'].values
+            half: ball_data[ball_data['half'] == half]['second'].values
             for half in tracking['half'].unique()
         }
 
