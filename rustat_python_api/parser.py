@@ -32,6 +32,20 @@ class RuStatParser:
         response = requests.get(query)
         return response.json()
 
+    def get_season_teams(self, season_id: int):
+        data = self.resp2data(
+            self.urls["tournament_teams"].format(
+                user=self.user,
+                password=self.password,
+                season_id=season_id
+            )
+        )
+
+        if data:
+            return data['data']['row']
+        else:
+            return []
+
     def get_rpl_info(self):
         for season_id in tqdm(range(1, 36)):
             data = self.resp2data(
