@@ -148,7 +148,8 @@ class PitchControl:
         location: np.ndarray,
         time_index: int,
         home_or_away: str,
-        half: int
+        half: int,
+        verbose: bool = False
     ):
         if home_or_away == 'h':
             data = self.locs_home[half].copy()
@@ -193,11 +194,12 @@ class PitchControl:
             Sigma = np.matmul(Sigma, np.linalg.inv(R)) ## this is not efficient, forgive me.
             out = mvn.pdf(location, mu, Sigma) / mvn.pdf(data[player_index][time_index, :], mu, Sigma)
         else:
-            print("Data is not finite.")
+            if verbose:
+                print("Data is not finite.")
             out = np.zeros(location.shape[0])
         return out
 
-    def fit(self, half: int, tp: int, dt: int) -> tuple:
+    def fit(self, half: int, tp: int, dt: int, verbose: bool = False) -> tuple:
         x = np.linspace(0, 105, dt)
         y = np.linspace(0, 68, dt)
         xx, yy = np.meshgrid(x, y)
@@ -209,10 +211,10 @@ class PitchControl:
 
         for k in self.locs_home[half].keys():
             # if len(self.locs_home[half][k]) >= tp:
-            Zh += self.influence_function(k, locations, tp, 'h', half)
+            Zh += self.influence_function(k, locations, tp, 'h', half, verbose)
         for k in self.locs_away[half].keys():
             # if len(self.locs_away[half][k]) >= tp:
-            Za += self.influence_function(k, locations, tp, 'a', half)
+            Za += self.influence_function(k, locations, tp, 'a', half, verbose)
 
         Zh = Zh.reshape((dt, dt))
         Za = Za.reshape((dt, dt))
