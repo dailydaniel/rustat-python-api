@@ -13,20 +13,27 @@ def process_list(x: pd.Series):
     else:
         return lst
 
+def take_last(x: pd.Series):
+    lst = x.dropna().tolist()
+    if lst:
+        return lst[-1]
+    return np.nan
+
 
 def gluing(df: pd.DataFrame) -> pd.DataFrame:
     cols = ['player_id', 'half', 'second', 'pos_x', 'pos_y']
 
-    df_gb = df.groupby(cols).agg(process_list).reset_index()
-    df_gb['possession_number'] = df_gb['possession_number'].apply(
-        lambda x: max(x) if isinstance(x, list) else x
-    )
-    df_gb['pos_dest_x'] = df_gb['pos_dest_x'].apply(
-        lambda x: x[0] if isinstance(x, list) else x
-    )
-    df_gb['pos_dest_y'] = df_gb['pos_dest_y'].apply(
-        lambda x: x[0] if isinstance(x, list) else x
-    )
+    agg_rules = {}
+
+    for col_name in df.columns:
+        if col_name not in cols:
+            if col_name in ['action_name', 'action_id']:
+                agg_rules[col_name] = process_list
+            else:
+                agg_rules[col_name] = take_last
+
+    df_gb = df.groupby(cols).agg(agg_rules).reset_index()
+
     df_gb['pos_dest_nan'] = (df_gb['pos_dest_x'].isna() & df_gb['pos_dest_y'].isna()).astype(int)
     df_gb = df_gb.sort_values(by=['half', 'second', 'possession_number', 'pos_dest_nan']).reset_index(drop=True)
     return df_gb
