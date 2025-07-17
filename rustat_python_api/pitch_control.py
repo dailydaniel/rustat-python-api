@@ -322,7 +322,7 @@ class PitchControl:
         diff = locs.view(1, -1, 2)  # (1,N,2)
         diff = diff - mu.unsqueeze(1)   # (P,N,2)
 
-        if device == "cuda":
+        if "cuda" in device:
             out = triton_influence(
                 mu.unsqueeze(0), Sigma_inv.unsqueeze(0),
                 locs, BLOCK_N=64
@@ -391,7 +391,7 @@ class PitchControl:
         diff = locs.view(1, 1, -1, 2)  # (1,1,N,2)
         diff = diff - mu.unsqueeze(2)   # (F,P,N,2)
 
-        if device == "cuda":
+        if "cuda" in device:
             out = triton_influence(mu, Sigma_inv, locs, BLOCK_N=64)  # (F,N)
 
             return out
