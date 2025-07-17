@@ -398,11 +398,24 @@ class PitchControl:
     @staticmethod
     def _stack_team_frames(players: list[np.ndarray], frames: np.ndarray, device: str, dtype: torch.dtype):
         """Stack positions for given frames into torch tensors (pos_t, pos_tp1)."""
+        # Ensure every player's trajectory is long enough; if not, pad by repeating
+        # the last available coordinate so that indexing `frames` and `frames+1` is safe.
+        max_needed = frames[-1] + 1  # we access idx and idx+1
+
+        padded = []
+        for p in players:
+            if len(p) <= max_needed:
+                pad_len = max_needed + 1 - len(p)
+                if pad_len > 0:
+                    last = p[-1][None, :]
+                    p = np.vstack([p, np.repeat(last, pad_len, axis=0)])
+            padded.append(p)
+
         pos_t = torch.tensor(
-            np.stack([p[frames] for p in players], axis=1), device=device, dtype=dtype
+            np.stack([p[frames] for p in padded], axis=1), device=device, dtype=dtype
         )  # (F,P,2)
         pos_tp1 = torch.tensor(
-            np.stack([p[frames + 1] for p in players], axis=1), device=device, dtype=dtype
+            np.stack([p[frames + 1] for p in padded], axis=1), device=device, dtype=dtype
         )
         return pos_t, pos_tp1
 
