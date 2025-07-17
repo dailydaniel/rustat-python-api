@@ -14,3 +14,4 @@ urllib3==2.2.3
 scipy==1.14.1
 matplotlib
 matplotsoccer
+torch
