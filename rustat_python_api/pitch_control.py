@@ -7,6 +7,8 @@ import matplotsoccer as mpl
 import torch
 from tqdm import tqdm
 
+from .kernels import triton_influence
+
 
 class PitchControl:
     def __init__(self, tracking: pd.DataFrame, events: pd.DataFrame, ball_data: pd.DataFrame = None):
@@ -320,15 +322,19 @@ class PitchControl:
         diff = locs.view(1, -1, 2)  # (1,N,2)
         diff = diff - mu.unsqueeze(1)   # (P,N,2)
 
-        maha = torch.einsum('pni,pij,pnj->pn', diff, Sigma_inv, diff)  # (P,N)
+        if device == "cuda":
+            out = triton_influence(
+                mu.unsqueeze(0), Sigma_inv.unsqueeze(0),
+                locs, BLOCK_N=64
+            )[0]  # (N,)
 
-        # Replace NaNs that arise from invalid player positions with large value
-        # so their influence tends to zero after exponent, then eliminate residual NaNs.
-        maha = torch.nan_to_num(maha, nan=1e9, posinf=1e9, neginf=1e9)
+            return out
+        else:
+            maha = torch.einsum('pni,pij,pnj->pn', diff, Sigma_inv, diff)  # (P,N)
+            maha = torch.nan_to_num(maha, nan=1e9, posinf=1e9, neginf=1e9)
+            out = torch.exp(-0.5 * maha)  # (P,N)
 
-        out = torch.exp(-0.5 * maha)  # (P,N)
-
-        return out.sum(dim=0)  # sum over players
+            return out.sum(dim=0)  # sum over players
 
     def _batch_team_influence_frames_pt(
         self,
@@ -385,15 +391,16 @@ class PitchControl:
         diff = locs.view(1, 1, -1, 2)  # (1,1,N,2)
         diff = diff - mu.unsqueeze(2)   # (F,P,N,2)
 
-        maha = torch.einsum('fpni,fpij,fpnj->fpn', diff, Sigma_inv, diff)  # (F,P,N)
+        if device == "cuda":
+            out = triton_influence(mu, Sigma_inv, locs, BLOCK_N=64)  # (F,N)
 
-        # Replace NaNs that arise from invalid player positions with large value
-        # so their influence tends to zero after exponent, then eliminate residual NaNs.
-        maha = torch.nan_to_num(maha, nan=1e9, posinf=1e9, neginf=1e9)
+            return out
+        else:
+            maha = torch.einsum('fpni,fpij,fpnj->fpn', diff, Sigma_inv, diff)  # (F,P,N)
+            maha = torch.nan_to_num(maha, nan=1e9, posinf=1e9, neginf=1e9)
+            out = torch.exp(-0.5 * maha)  # (F,P,N)
 
-        out = torch.exp(-0.5 * maha)  # (F,P,N)
-
-        return out.sum(dim=1)  # sum over players
+            return out.sum(dim=1)  # sum over players
 
     @staticmethod
     def _stack_team_frames(players: list[np.ndarray], frames: np.ndarray, device: str, dtype: torch.dtype):
