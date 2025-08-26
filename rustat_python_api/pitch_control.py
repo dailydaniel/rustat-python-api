@@ -7,8 +7,10 @@ import matplotsoccer as mpl
 import torch
 from tqdm import tqdm
 
-from .kernels import triton_influence
-
+try:
+    from .kernels import triton_influence
+except ImportError:
+    triton_influence = None
 
 class PitchControl:
     def __init__(self, tracking: pd.DataFrame, events: pd.DataFrame, ball_data: pd.DataFrame = None):

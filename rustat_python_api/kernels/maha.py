@@ -1,6 +1,11 @@
 import torch
-import triton
-import triton.language as tl
+
+try:
+    import triton
+    import triton.language as tl
+except ImportError:
+    triton = None
+    tl = None
 
 
 @triton.jit

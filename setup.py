@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='rustat-python-api',
-    version='0.6.6',
+    version='0.7.0',
     description='A Python wrapper for RuStat API',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
