@@ -46,8 +46,8 @@ class RuStatParser:
         else:
             return []
 
-    def get_rpl_info(self):
-        for season_id in tqdm(range(1, 36)):
+    def get_rpl_info(self, start_season: int = 1, end_season: int = 37):
+        for season_id in tqdm(range(start_season, end_season)):
             data = self.resp2data(
                 self.urls["tournament_teams"].format(
                     user=self.user,
