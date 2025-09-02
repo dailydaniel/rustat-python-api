@@ -50,7 +50,7 @@ class MatchInferLoader:
         self.events = tr_adder.events
 
     def fit(self, inplace: bool = False):
-        self._save_events()
+        self._save_index()
         self._process_events()
         self._add_pc_features()
         self._add_tr_features()
