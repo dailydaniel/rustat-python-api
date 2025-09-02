@@ -12,6 +12,7 @@ class MatchInferLoader:
             events: pd.DataFrame, tracking: pd.DataFrame, ball: pd.DataFrame,
             modes: list[str], rads: list[int],
             radii: list[int], cone_degrees: list[int], k_list: list[int],
+            device: str = "cpu", backend: str = "pt"
     ):
         self.events = events
         self.tracking = tracking
@@ -22,6 +23,9 @@ class MatchInferLoader:
         self.cone_degrees = cone_degrees
         self.k_list = k_list
 
+        self.device = device
+        self.backend = backend
+
     def _save_index(self):
         self.events['orig_index'] = self.events.index
 
@@ -29,7 +33,10 @@ class MatchInferLoader:
         self.events = process_events_after_loading(self.events)
 
     def _add_pc_features(self):
-        pc_adder = PitchControlAdder(self.events, self.tracking, self.ball, device="mps", backend="pt")
+        pc_adder = PitchControlAdder(
+            self.events, self.tracking, self.ball,
+            device=self.device, backend=self.backend
+        )
         pc_adder.run(modes=self.modes, rads=self.rads)
         self.events = pc_adder.events
 
