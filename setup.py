@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='rustat-python-api',
-    version='0.7.7',
+    version='0.7.8',
     description='A Python wrapper for RuStat API',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -17,13 +17,12 @@ setup(
         'tqdm==4.66.5',
         'scipy==1.14.1',
         'matplotlib',
-        'matplotsoccer',
-        'torch',
+        'matplotsoccer'
     ],
     extras_require={
         "gpu": [
             "torch",
-            "triton==3.0.0; platform_system=='Linux'",
+            "triton==3.0.0; platform_system=='Linux'"
         ],
         "cpu": [
             "torch"
