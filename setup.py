@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='rustat-python-api',
-    version='0.7.5',
+    version='0.7.6',
     description='A Python wrapper for RuStat API',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -21,6 +21,15 @@ setup(
         'torch',
         'triton==3.0.0; platform_system=="Linux"'
     ],
+    extras_require={
+        "gpu": [
+            "torch",
+            "triton==3.0.0; platform_system=='Linux'",
+        ],
+        "cpu": [
+            "torch"
+        ]
+    },
     classifiers=[
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',
