@@ -137,7 +137,8 @@ class PitchControl:
         """Vectorised construction of player location dictionaries.
 
         Returns (locs_home, locs_away) where each is
-        {half: {player_id: np.ndarray(T,2)}}.
+        {half: {player_id: np.ndarray(T,2)}} where T is the full length of the half.
+        Players not on field at time t have NaN coordinates at index t.
         """
         locs_home = {1: {}, 2: {}}
         locs_away = {1: {}, 2: {}}
@@ -145,10 +146,30 @@ class PitchControl:
         # Work per half to keep order and avoid extra boolean checks.
         for half in (1, 2):
             half_df = tracking[tracking["half"] == half]
+
+            # Get all unique timestamps for this half (sorted)
+            all_timestamps = np.sort(half_df["second"].unique())
+
             for side, locs_out in [("left", locs_home), ("right", locs_away)]:
                 side_df = half_df[half_df["side_1h"] == side]
-                for pid, grp in side_df.groupby("player_id"):
-                    locs_out[half][pid] = grp[["pos_x", "pos_y"]].values
+
+                for pid in side_df["player_id"].unique():
+                    # Get data for this specific player
+                    player_data = side_df[side_df["player_id"] == pid][
+                        ["second", "pos_x", "pos_y"]
+                    ].copy()
+
+                    # Create full timeline DataFrame with all timestamps
+                    full_timeline = pd.DataFrame({"second": all_timestamps})
+
+                    # Left join: timestamps without player data will have NaN coordinates
+                    player_data_full = full_timeline.merge(
+                        player_data, on="second", how="left"
+                    )
+
+                    # Store only coordinates (NaN where player is not on field)
+                    locs_out[half][pid] = player_data_full[["pos_x", "pos_y"]].values
+
         return locs_home, locs_away
 
     @staticmethod
@@ -385,7 +406,21 @@ class PitchControl:
 
         device = locs.device
 
-        sxy = (pos_tp1 - pos_t) / dt_secs[:, None, None]  # (F,P,2)
+        # Create validity mask for players (not NaN at both t and t+1)
+        valid_mask = torch.isfinite(pos_t).all(dim=-1) & torch.isfinite(pos_tp1).all(
+            dim=-1
+        )  # (F,P)
+
+        # Replace NaN with zeros to avoid NaN propagation in calculations
+        # (these values will be masked out later)
+        pos_t_clean = torch.where(
+            valid_mask.unsqueeze(-1), pos_t, torch.zeros_like(pos_t)
+        )
+        pos_tp1_clean = torch.where(
+            valid_mask.unsqueeze(-1), pos_tp1, torch.zeros_like(pos_tp1)
+        )
+
+        sxy = (pos_tp1_clean - pos_t_clean) / dt_secs[:, None, None]  # (F,P,2)
         speed = torch.linalg.norm(sxy, dim=-1)  # (F,P)
         norm_sxy = speed.clamp(min=1e-6)
 
@@ -402,7 +437,7 @@ class PitchControl:
 
         Srat = (speed / 13) ** 2  # (F,P)
 
-        Ri = torch.linalg.norm(ball_pos[:, None, :] - pos_t, dim=-1)  # (F,P)
+        Ri = torch.linalg.norm(ball_pos[:, None, :] - pos_t_clean, dim=-1)  # (F,P)
         Ri = torch.minimum(
             4 + Ri**3 / (18**3 / 6), torch.tensor(10.0, device=device, dtype=dtype)
         )
@@ -411,7 +446,7 @@ class PitchControl:
         S22 = (1 - Srat) * Ri / 2
 
         S = torch.zeros(
-            (*pos_t.shape[:-1], 2, 2), device=device, dtype=dtype
+            (*pos_t_clean.shape[:-1], 2, 2), device=device, dtype=dtype
         )  # (F,P,2,2)
         S[..., 0, 0] = S11
         S[..., 1, 1] = S22
@@ -426,7 +461,15 @@ class PitchControl:
         else:
             Sigma_inv = torch.linalg.inv(Sigma + eye)
 
-        mu = pos_t + 0.5 * sxy  # (F,P,2)
+        # Mask out invalid players by zeroing their Sigma_inv
+        # This ensures their influence contribution is exactly 0
+        Sigma_inv = torch.where(
+            valid_mask.unsqueeze(-1).unsqueeze(-1),  # (F,P,1,1)
+            Sigma_inv,
+            torch.zeros_like(Sigma_inv),
+        )
+
+        mu = pos_t_clean + 0.5 * sxy  # (F,P,2)
 
         diff = locs.view(1, 1, -1, 2)  # (1,1,N,2)
         diff = diff - mu.unsqueeze(2)  # (F,P,N,2)
@@ -446,25 +489,17 @@ class PitchControl:
     def _stack_team_frames(
         players: list[np.ndarray], frames: np.ndarray, device: str, dtype: torch.dtype
     ):
-        """Stack positions for given frames into torch tensors (pos_t, pos_tp1)."""
-        # Ensure every player's trajectory is long enough; if not, pad by repeating
-        # the last available coordinate so that indexing `frames` and `frames+1` is safe.
-        max_needed = frames[-1] + 1  # we access idx and idx+1
+        """Stack positions for given frames into torch tensors (pos_t, pos_tp1).
 
-        padded = []
-        for p in players:
-            if len(p) <= max_needed:
-                pad_len = max_needed + 1 - len(p)
-                if pad_len > 0:
-                    last = p[-1][None, :]
-                    p = np.vstack([p, np.repeat(last, pad_len, axis=0)])
-            padded.append(p)
-
+        After build_player_locs alignment, all player arrays have the same length
+        (full timeline), so no padding is needed. Players not on field have NaN coordinates.
+        """
+        # All arrays are now aligned, just stack them directly
         pos_t = torch.tensor(
-            np.stack([p[frames] for p in padded], axis=1), device=device, dtype=dtype
+            np.stack([p[frames] for p in players], axis=1), device=device, dtype=dtype
         )  # (F,P,2)
         pos_tp1 = torch.tensor(
-            np.stack([p[frames + 1] for p in padded], axis=1),
+            np.stack([p[frames + 1] for p in players], axis=1),
             device=device,
             dtype=dtype,
         )
