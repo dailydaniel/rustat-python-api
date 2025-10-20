@@ -734,21 +734,27 @@ class PitchControl:
 
         for k in self.locs_home[half].keys():
             # if len(self.locs_home[half][k]) >= tp:
-            if np.isfinite(self.locs_home[half][k][tp, :]).all():
-                plt.scatter(
-                    self.locs_home[half][k][tp, 0],
-                    self.locs_home[half][k][tp, 1],
-                    color="darkgrey",
-                )
+            try:
+                if np.isfinite(self.locs_home[half][k][tp, :]).all():
+                    plt.scatter(
+                        self.locs_home[half][k][tp, 0],
+                        self.locs_home[half][k][tp, 1],
+                        color="darkgrey",
+                    )
+            except Exception as e:
+                print(f"No data for player {k}: {e}")
 
         for k in self.locs_away[half].keys():
             # if len(self.locs_away[half][k]) >= tp:
-            if np.isfinite(self.locs_away[half][k][tp, :]).all():
-                plt.scatter(
-                    self.locs_away[half][k][tp, 0],
-                    self.locs_away[half][k][tp, 1],
-                    color="black",
-                )
+            try:
+                if np.isfinite(self.locs_away[half][k][tp, :]).all():
+                    plt.scatter(
+                        self.locs_away[half][k][tp, 0],
+                        self.locs_away[half][k][tp, 1],
+                        color="black",
+                    )
+            except Exception as e:
+                print(f"No data for player {k}: {e}")
 
         plt.scatter(
             self.locs_ball[half][tp, 0], self.locs_ball[half][tp, 1], color="red"
