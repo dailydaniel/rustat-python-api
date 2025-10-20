@@ -1,37 +1,32 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='rustat-python-api',
-    version='0.7.8',
-    description='A Python wrapper for RuStat API',
-    long_description=open('README.md').read(),
-    long_description_content_type='text/markdown',
-    author='Daniel Zholkovsky',
-    author_email='daniel@zholkovsky.com',
-    url='https://github.com/dailydaniel/rustat-python-api',
-    license='MIT',
+    name="rustat-python-api",
+    version="0.7.9",
+    description="A Python wrapper for RuStat API",
+    long_description=open("README.md").read(),
+    long_description_content_type="text/markdown",
+    author="Daniel Zholkovsky",
+    author_email="daniel@zholkovsky.com",
+    url="https://github.com/dailydaniel/rustat-python-api",
+    license="MIT",
     packages=find_packages(),
     install_requires=[
-        'requests==2.32.3',
-        'pandas==2.2.3',
-        'tqdm==4.66.5',
-        'scipy==1.14.1',
-        'matplotlib',
-        'matplotsoccer'
+        "requests==2.32.3",
+        "pandas==2.2.3",
+        "tqdm==4.66.5",
+        "scipy==1.14.1",
+        "matplotlib",
+        "matplotsoccer",
     ],
     extras_require={
-        "gpu": [
-            "torch",
-            "triton==3.0.0; platform_system=='Linux'"
-        ],
-        "cpu": [
-            "torch"
-        ]
+        "gpu": ["torch", "triton==3.0.0; platform_system=='Linux'"],
+        "cpu": ["torch"],
     },
     classifiers=[
-        'Programming Language :: Python :: 3',
-        'License :: OSI Approved :: MIT License',
-        'Operating System :: OS Independent',
+        "Programming Language :: Python :: 3",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
     ],
-    python_requires='>=3.10',
+    python_requires=">=3.10",
 )

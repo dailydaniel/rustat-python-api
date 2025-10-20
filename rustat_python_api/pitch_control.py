@@ -12,52 +12,71 @@ try:
 except ImportError:
     triton_influence = None
 
+
 class PitchControl:
-    def __init__(self, tracking: pd.DataFrame, events: pd.DataFrame, ball_data: pd.DataFrame = None):
-        self.team_ids = tracking['team_id'].unique()
-        sides = tracking.groupby('team_id')['side_1h'].unique()
-        side_by_team = dict(zip(self.team_ids, sides[self.team_ids].apply(lambda x: x[0])))
+    def __init__(
+        self,
+        tracking: pd.DataFrame,
+        events: pd.DataFrame,
+        ball_data: pd.DataFrame = None,
+    ):
+        self.team_ids = tracking["team_id"].unique()
+        sides = tracking.groupby("team_id")["side_1h"].unique()
+        side_by_team = dict(
+            zip(self.team_ids, sides[self.team_ids].apply(lambda x: x[0]))
+        )
         self.side_by_half = {
             1: side_by_team,
-            2:
-                {
-                    team: 'left' if side == 'right' else 'right'
-                    for team, side in side_by_team.items()
-                }
+            2: {
+                team: "left" if side == "right" else "right"
+                for team, side in side_by_team.items()
+            },
         }
 
-        self._grid_cache: dict[tuple[int, str, torch.dtype], tuple[torch.Tensor, torch.Tensor, torch.Tensor]] = {}
+        self._grid_cache: dict[
+            tuple[int, str, torch.dtype],
+            tuple[torch.Tensor, torch.Tensor, torch.Tensor],
+        ] = {}
 
         self.locs_home, self.locs_away, self.locs_ball, self.t = self.get_locs(
-            tracking,
-            events,
-            ball_data
+            tracking, events, ball_data
         )
 
-    def get_locs(self, tracking: pd.DataFrame, events: pd.DataFrame, ball_data: pd.DataFrame | None) -> tuple:
-        events = events[[
-            'possession_number', 'team_id', 'possession_team_id',
-            'half', 'second', 'pos_x', 'pos_y'
-        ]]
+    def get_locs(
+        self,
+        tracking: pd.DataFrame,
+        events: pd.DataFrame,
+        ball_data: pd.DataFrame | None,
+    ) -> tuple:
+        events = events[
+            [
+                "possession_number",
+                "team_id",
+                "possession_team_id",
+                "half",
+                "second",
+                "pos_x",
+                "pos_y",
+            ]
+        ]
 
         events = self.swap_coords_batch(events)
 
         if ball_data is None:
             ball_data = self.interpolate_ball_data(
-                events[['half', 'second', 'pos_x', 'pos_y']],
-                tracking
+                events[["half", "second", "pos_x", "pos_y"]], tracking
             )
 
         locs_home, locs_away = self.build_player_locs(tracking)
 
         locs_ball = {
-            half: ball_data[ball_data['half'] == half][['pos_x', 'pos_y']].values
-            for half in tracking['half'].unique()
+            half: ball_data[ball_data["half"] == half][["pos_x", "pos_y"]].values
+            for half in tracking["half"].unique()
         }
 
         t = {
-            half: ball_data[ball_data['half'] == half]['second'].values
-            for half in tracking['half'].unique()
+            half: ball_data[ball_data["half"] == half]["second"].values
+            for half in tracking["half"].unique()
         }
 
         return locs_home, locs_away, locs_ball, t
@@ -96,20 +115,22 @@ class PitchControl:
         side_by_half = self.side_by_half  # local alias for speed
 
         def needs_swap(row):
-            team_id = row['team_id']
-            poss = row['possession_team_id']
-            half = row['half']
+            team_id = row["team_id"]
+            poss = row["possession_team_id"]
+            half = row["half"]
 
-            current_left = team_id in poss if isinstance(poss, list) else team_id == poss
-            current_side = 'left' if current_left else 'right'
+            current_left = (
+                team_id in poss if isinstance(poss, list) else team_id == poss
+            )
+            current_side = "left" if current_left else "right"
             real_side = side_by_half[half][str(int(team_id))]
             return current_side != real_side
 
         mask = events.apply(needs_swap, axis=1)
 
         # flip coords in bulk
-        events.loc[mask, 'pos_x'] = 105 - events.loc[mask, 'pos_x']
-        events.loc[mask, 'pos_y'] = 68  - events.loc[mask, 'pos_y']
+        events.loc[mask, "pos_x"] = 105 - events.loc[mask, "pos_x"]
+        events.loc[mask, "pos_y"] = 68 - events.loc[mask, "pos_y"]
         return events
 
     def build_player_locs(self, tracking: pd.DataFrame):
@@ -123,36 +144,35 @@ class PitchControl:
 
         # Work per half to keep order and avoid extra boolean checks.
         for half in (1, 2):
-            half_df = tracking[tracking['half'] == half]
-            for side, locs_out in [('left', locs_home), ('right', locs_away)]:
-                side_df = half_df[half_df['side_1h'] == side]
-                for pid, grp in side_df.groupby('player_id'):
-                    locs_out[half][pid] = grp[['pos_x', 'pos_y']].values
+            half_df = tracking[tracking["half"] == half]
+            for side, locs_out in [("left", locs_home), ("right", locs_away)]:
+                side_df = half_df[half_df["side_1h"] == side]
+                for pid, grp in side_df.groupby("player_id"):
+                    locs_out[half][pid] = grp[["pos_x", "pos_y"]].values
         return locs_home, locs_away
 
     @staticmethod
     def interpolate_ball_data(
-        ball_data: pd.DataFrame,
-        player_data: pd.DataFrame
+        ball_data: pd.DataFrame, player_data: pd.DataFrame
     ) -> pd.DataFrame:
-        ball_data = ball_data.drop_duplicates(subset=['second', 'half'])
+        ball_data = ball_data.drop_duplicates(subset=["second", "half"])
 
         interpolated_data = []
-        for half in ball_data['half'].unique():
-            ball_half = ball_data[ball_data['half'] == half]
-            player_half = player_data[player_data['half'] == half]
+        for half in ball_data["half"].unique():
+            ball_half = ball_data[ball_data["half"] == half]
+            player_half = player_data[player_data["half"] == half]
 
-            player_times = player_half['second'].unique()
+            player_times = player_half["second"].unique()
 
-            ball_half = ball_half.sort_values(by='second')
-            interpolated_half = pd.DataFrame({'second': player_times})
-            interpolated_half['pos_x'] = np.interp(
-                interpolated_half['second'], ball_half['second'], ball_half['pos_x']
+            ball_half = ball_half.sort_values(by="second")
+            interpolated_half = pd.DataFrame({"second": player_times})
+            interpolated_half["pos_x"] = np.interp(
+                interpolated_half["second"], ball_half["second"], ball_half["pos_x"]
             )
-            interpolated_half['pos_y'] = np.interp(
-                interpolated_half['second'], ball_half['second'], ball_half['pos_y']
+            interpolated_half["pos_y"] = np.interp(
+                interpolated_half["second"], ball_half["second"], ball_half["pos_y"]
             )
-            interpolated_half['half'] = half
+            interpolated_half["half"] = half
             interpolated_data.append(interpolated_half)
 
         interpolated_ball_data = pd.concat(interpolated_data, ignore_index=True)
@@ -160,16 +180,15 @@ class PitchControl:
 
     @staticmethod
     def get_player_data(player_id, half, tracking):
-        timestamps = tracking[tracking['half'] == half]['second'].unique()
+        timestamps = tracking[tracking["half"] == half]["second"].unique()
         player_data = tracking[
-            (tracking['player_id'] == player_id)
-            & (tracking['half'] == half)
-        ][['second', 'pos_x', 'pos_y']]
+            (tracking["player_id"] == player_id) & (tracking["half"] == half)
+        ][["second", "pos_x", "pos_y"]]
 
-        player_data_full = pd.DataFrame({'second': timestamps})
-        player_data_full = player_data_full.merge(player_data, on='second', how='left')
+        player_data_full = pd.DataFrame({"second": timestamps})
+        player_data_full = player_data_full.merge(player_data, on="second", how="left")
 
-        return player_data_full[['pos_x', 'pos_y']].values
+        return player_data_full[["pos_x", "pos_y"]].values
 
     def influence_np(
         self,
@@ -178,11 +197,11 @@ class PitchControl:
         time_index: int,
         home_or_away: str,
         half: int,
-        verbose: bool = False
+        verbose: bool = False,
     ):
-        if home_or_away == 'h':
+        if home_or_away == "h":
             data = self.locs_home[half].copy()
-        elif home_or_away == 'a':
+        elif home_or_away == "a":
             data = self.locs_away[half].copy()
         else:
             raise ValueError("Enter either 'h' or 'a'.")
@@ -190,38 +209,44 @@ class PitchControl:
         locs_ball = self.locs_ball[half].copy()
         t = self.t[half].copy()
 
-        if (
-                np.all(np.isfinite(data[player_index][[time_index, time_index + 1], :]))
-                & np.all(np.isfinite(locs_ball[time_index, :]))
-        ):
-            jitter = 1e-10 ## to prevent identically zero covariance matrices when velocity is zero
+        if np.all(
+            np.isfinite(data[player_index][[time_index, time_index + 1], :])
+        ) & np.all(np.isfinite(locs_ball[time_index, :])):
+            jitter = 1e-10  ## to prevent identically zero covariance matrices when velocity is zero
             ## compute velocity by fwd difference
-            s = (
-                    np.linalg.norm(
-                        data[player_index][time_index + 1,:]
-                        - data[player_index][time_index,:] + jitter
-                    )
-                    / (t[time_index + 1] - t[time_index])
-            )
+            s = np.linalg.norm(
+                data[player_index][time_index + 1, :]
+                - data[player_index][time_index, :]
+                + jitter
+            ) / (t[time_index + 1] - t[time_index])
             ## velocities in x,y directions
             sxy = (
-                    (data[player_index][time_index + 1, :] - data[player_index][time_index, :] + jitter)
-                    / (t[time_index + 1] - t[time_index])
-            )
+                data[player_index][time_index + 1, :]
+                - data[player_index][time_index, :]
+                + jitter
+            ) / (t[time_index + 1] - t[time_index])
             ## angle between velocity vector & x-axis
             theta = np.arccos(sxy[0] / np.linalg.norm(sxy))
             ## rotation matrix
-            R = np.array([[np.cos(theta), -np.sin(theta)],[np.sin(theta), np.cos(theta)]])
+            R = np.array(
+                [[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]]
+            )
             mu = data[player_index][time_index, :] + sxy * 0.5
             Srat = (s / 13) ** 2
-            Ri = np.linalg.norm(locs_ball[time_index, :] - data[player_index][time_index, :])
+            Ri = np.linalg.norm(
+                locs_ball[time_index, :] - data[player_index][time_index, :]
+            )
             ## don't think this function is specified in the paper but looks close enough to fig 9
-            Ri = np.minimum(4 + Ri ** 3/ (18 ** 3 / 6), 10)
+            Ri = np.minimum(4 + Ri**3 / (18**3 / 6), 10)
             S = np.array([[(1 + Srat) * Ri / 2, 0], [0, (1 - Srat) * Ri / 2]])
             Sigma = np.matmul(R, S)
             Sigma = np.matmul(Sigma, S)
-            Sigma = np.matmul(Sigma, np.linalg.inv(R)) ## this is not efficient, forgive me.
-            out = mvn.pdf(location, mu, Sigma) / mvn.pdf(data[player_index][time_index, :], mu, Sigma)
+            Sigma = np.matmul(
+                Sigma, np.linalg.inv(R)
+            )  ## this is not efficient, forgive me.
+            out = mvn.pdf(location, mu, Sigma) / mvn.pdf(
+                data[player_index][time_index, :], mu, Sigma
+            )
         else:
             if verbose:
                 print("Data is not finite.")
@@ -270,8 +295,12 @@ class PitchControl:
         if not pos_t_list:
             return torch.zeros(locs.shape[0], device=device, dtype=dtype)
 
-        pos_t = torch.tensor(np.asarray(pos_t_list), device=device, dtype=dtype)  # (P,2)
-        pos_tp1 = torch.tensor(np.asarray(pos_tp1_list), device=device, dtype=dtype)  # (P,2)
+        pos_t = torch.tensor(
+            np.asarray(pos_t_list), device=device, dtype=dtype
+        )  # (P,2)
+        pos_tp1 = torch.tensor(
+            np.asarray(pos_tp1_list), device=device, dtype=dtype
+        )  # (P,2)
 
         # Velocity, speed, rotation -------------------------
         dt_sec = float(self.t[half][time_index + 1] - self.t[half][time_index])
@@ -280,13 +309,15 @@ class PitchControl:
         speed = torch.linalg.norm(sxy, dim=1)  # (P,)
         norm_sxy = speed.clamp(min=1e-6)
 
-        theta = torch.acos(torch.clamp(sxy[:, 0] / norm_sxy, -1 + 1e-6, 1 - 1e-6))  # (P,)
+        theta = torch.acos(
+            torch.clamp(sxy[:, 0] / norm_sxy, -1 + 1e-6, 1 - 1e-6)
+        )  # (P,)
         cos_t, sin_t = torch.cos(theta), torch.sin(theta)
 
         R = torch.stack(
             [
                 torch.stack([cos_t, -sin_t], dim=1),
-                torch.stack([sin_t,  cos_t], dim=1),
+                torch.stack([sin_t, cos_t], dim=1),
             ],
             dim=1,
         )  # (P,2,2)
@@ -298,7 +329,9 @@ class PitchControl:
             self.locs_ball[half][time_index], device=device, dtype=dtype
         )  # (2,)
         Ri = torch.linalg.norm(ball_pos - pos_t, dim=1)  # (P,)
-        Ri = torch.minimum(4 + Ri ** 3 / (18 ** 3 / 6), torch.tensor(10.0, device=device, dtype=dtype))
+        Ri = torch.minimum(
+            4 + Ri**3 / (18**3 / 6), torch.tensor(10.0, device=device, dtype=dtype)
+        )
 
         S11 = (1 + Srat) * Ri / 2
         S22 = (1 - Srat) * Ri / 2
@@ -322,19 +355,18 @@ class PitchControl:
 
         # Grid diff & Mahalanobis ----------------------------
         diff = locs.view(1, -1, 2)  # (1,N,2)
-        diff = diff - mu.unsqueeze(1)   # (P,N,2)
+        diff = diff - mu.unsqueeze(1)  # (P,N,2)
 
         device = torch.device(device)
 
-        if device.type == 'cuda':
+        if device.type == "cuda":
             out = triton_influence(
-                mu.unsqueeze(0), Sigma_inv.unsqueeze(0),
-                locs, BLOCK_N=64
+                mu.unsqueeze(0), Sigma_inv.unsqueeze(0), locs, BLOCK_N=64
             )[0]  # (N,)
 
             return out
         else:
-            maha = torch.einsum('pni,pij,pnj->pn', diff, Sigma_inv, diff)  # (P,N)
+            maha = torch.einsum("pni,pij,pnj->pn", diff, Sigma_inv, diff)  # (P,N)
             maha = torch.nan_to_num(maha, nan=1e9, posinf=1e9, neginf=1e9)
             out = torch.exp(-0.5 * maha)  # (P,N)
 
@@ -342,19 +374,19 @@ class PitchControl:
 
     def _batch_team_influence_frames_pt(
         self,
-        pos_t: torch.Tensor,        # (F,P,2)
-        pos_tp1: torch.Tensor,      # (F,P,2)
-        ball_pos: torch.Tensor,     # (F,2)
-        dt_secs: torch.Tensor,      # (F,)
-        locs: torch.Tensor,         # (N,2)
+        pos_t: torch.Tensor,  # (F,P,2)
+        pos_tp1: torch.Tensor,  # (F,P,2)
+        ball_pos: torch.Tensor,  # (F,2)
+        dt_secs: torch.Tensor,  # (F,)
+        locs: torch.Tensor,  # (N,2)
         dtype: torch.dtype,
-    ) -> torch.Tensor:              # returns (F,N)
+    ) -> torch.Tensor:  # returns (F,N)
         """Vectorised influence for many frames & players of ОДНОЙ команды."""
 
         device = locs.device
 
         sxy = (pos_tp1 - pos_t) / dt_secs[:, None, None]  # (F,P,2)
-        speed = torch.linalg.norm(sxy, dim=-1)            # (F,P)
+        speed = torch.linalg.norm(sxy, dim=-1)  # (F,P)
         norm_sxy = speed.clamp(min=1e-6)
 
         theta = torch.acos(torch.clamp(sxy[..., 0] / norm_sxy, -1 + 1e-6, 1 - 1e-6))
@@ -363,7 +395,7 @@ class PitchControl:
         R = torch.stack(
             [
                 torch.stack([cos_t, -sin_t], dim=-1),
-                torch.stack([sin_t,  cos_t], dim=-1),
+                torch.stack([sin_t, cos_t], dim=-1),
             ],
             dim=-2,
         )  # (F,P,2,2)
@@ -371,12 +403,16 @@ class PitchControl:
         Srat = (speed / 13) ** 2  # (F,P)
 
         Ri = torch.linalg.norm(ball_pos[:, None, :] - pos_t, dim=-1)  # (F,P)
-        Ri = torch.minimum(4 + Ri ** 3 / (18 ** 3 / 6), torch.tensor(10.0, device=device, dtype=dtype))
+        Ri = torch.minimum(
+            4 + Ri**3 / (18**3 / 6), torch.tensor(10.0, device=device, dtype=dtype)
+        )
 
         S11 = (1 + Srat) * Ri / 2
         S22 = (1 - Srat) * Ri / 2
 
-        S = torch.zeros((*pos_t.shape[:-1], 2, 2), device=device, dtype=dtype)  # (F,P,2,2)
+        S = torch.zeros(
+            (*pos_t.shape[:-1], 2, 2), device=device, dtype=dtype
+        )  # (F,P,2,2)
         S[..., 0, 0] = S11
         S[..., 1, 1] = S22
 
@@ -393,21 +429,23 @@ class PitchControl:
         mu = pos_t + 0.5 * sxy  # (F,P,2)
 
         diff = locs.view(1, 1, -1, 2)  # (1,1,N,2)
-        diff = diff - mu.unsqueeze(2)   # (F,P,N,2)
+        diff = diff - mu.unsqueeze(2)  # (F,P,N,2)
 
-        if device.type == 'cuda':
+        if device.type == "cuda":
             out = triton_influence(mu, Sigma_inv, locs, BLOCK_N=64)  # (F,N)
 
             return out
         else:
-            maha = torch.einsum('fpni,fpij,fpnj->fpn', diff, Sigma_inv, diff)  # (F,P,N)
+            maha = torch.einsum("fpni,fpij,fpnj->fpn", diff, Sigma_inv, diff)  # (F,P,N)
             maha = torch.nan_to_num(maha, nan=1e9, posinf=1e9, neginf=1e9)
             out = torch.exp(-0.5 * maha)  # (F,P,N)
 
             return out.sum(dim=1)  # sum over players
 
     @staticmethod
-    def _stack_team_frames(players: list[np.ndarray], frames: np.ndarray, device: str, dtype: torch.dtype):
+    def _stack_team_frames(
+        players: list[np.ndarray], frames: np.ndarray, device: str, dtype: torch.dtype
+    ):
         """Stack positions for given frames into torch tensors (pos_t, pos_tp1)."""
         # Ensure every player's trajectory is long enough; if not, pad by repeating
         # the last available coordinate so that indexing `frames` and `frames+1` is safe.
@@ -426,7 +464,9 @@ class PitchControl:
             np.stack([p[frames] for p in padded], axis=1), device=device, dtype=dtype
         )  # (F,P,2)
         pos_tp1 = torch.tensor(
-            np.stack([p[frames + 1] for p in padded], axis=1), device=device, dtype=dtype
+            np.stack([p[frames + 1] for p in padded], axis=1),
+            device=device,
+            dtype=dtype,
         )
         return pos_t, pos_tp1
 
@@ -438,6 +478,7 @@ class PitchControl:
         batch_size: int,
         use_fp16: bool,
         verbose: bool,
+        return_teams: str = "both",
     ):
         """Internal helper with fully batched PyTorch implementation."""
 
@@ -467,8 +508,12 @@ class PitchControl:
             )
 
             # stack teams
-            pos_t_h, pos_tp1_h = self._stack_team_frames(home_players, frames, device, dtype)
-            pos_t_a, pos_tp1_a = self._stack_team_frames(away_players, frames, device, dtype)
+            pos_t_h, pos_tp1_h = self._stack_team_frames(
+                home_players, frames, device, dtype
+            )
+            pos_t_a, pos_tp1_a = self._stack_team_frames(
+                away_players, frames, device, dtype
+            )
 
             Zh = self._batch_team_influence_frames_pt(
                 pos_t_h, pos_tp1_h, ball_pos, dt_secs, locs_t, dtype
@@ -477,15 +522,30 @@ class PitchControl:
                 pos_t_a, pos_tp1_a, ball_pos, dt_secs, locs_t, dtype
             )
 
-            res_batch = torch.sigmoid(Za - Zh).reshape(-1, dt, dt)
+            # Return raw team influence or combined logistic transformation
+            if return_teams == "home":
+                res_batch = torch.clamp(Zh, 0, 1).reshape(
+                    -1, dt, dt
+                )  # home team influence only
+            elif return_teams == "away":
+                res_batch = torch.clamp(Za, 0, 1).reshape(
+                    -1, dt, dt
+                )  # away team influence only
+            else:  # "both"
+                res_batch = torch.sigmoid(Za - Zh).reshape(
+                    -1, dt, dt
+                )  # logistic transformation
+
             pc_all[start:end] = res_batch.cpu().numpy().astype(np.float32)
 
             if verbose:
-                print(f"pt full: frames {start}-{end-1} done")
+                print(f"pt full: frames {start}-{end - 1} done")
 
         return pc_all, xx, yy
 
-    def _get_grid(self, dt: int, device: str, dtype: torch.dtype) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def _get_grid(
+        self, dt: int, device: str, dtype: torch.dtype
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Helper to create a grid of locations for torch-based pitch control."""
         x = torch.linspace(0, 105, dt, device=device, dtype=dtype)
         y = torch.linspace(0, 68, dt, device=device, dtype=dtype)
@@ -501,6 +561,7 @@ class PitchControl:
         device: str = "cpu",
         verbose: bool = False,
         use_fp16: bool = True,
+        return_teams: str = "both",
     ):
         """Torch-accelerated pitch-control calculation.
 
@@ -533,31 +594,51 @@ class PitchControl:
             self.locs_away[half], locs_t, tp, half, device, dtype
         )
 
-        res_t = torch.sigmoid(Za - Zh).reshape(dt, dt)
+        # Return raw team influence or combined logistic transformation
+        if return_teams == "home":
+            res_t = torch.clamp(Zh, 0, 1).reshape(dt, dt)  # home team influence only
+        elif return_teams == "away":
+            res_t = torch.clamp(Za, 0, 1).reshape(dt, dt)  # away team influence only
+        else:  # "both"
+            res_t = torch.sigmoid(Za - Zh).reshape(dt, dt)  # logistic transformation
 
         # Convert to numpy for downstream plotting
         return res_t.cpu().numpy(), xx_t.cpu().numpy(), yy_t.cpu().numpy()
 
-    def _fit_np(self, half: int, tp: int, dt: int, verbose: bool = False) -> tuple:
+    def _fit_np(
+        self,
+        half: int,
+        tp: int,
+        dt: int,
+        verbose: bool = False,
+        return_teams: str = "both",
+    ) -> tuple:
         x = np.linspace(0, 105, dt)
         y = np.linspace(0, 68, dt)
         xx, yy = np.meshgrid(x, y)
 
-        Zh = np.zeros(dt*dt)
-        Za = np.zeros(dt*dt)
+        Zh = np.zeros(dt * dt)
+        Za = np.zeros(dt * dt)
 
-        locations = np.c_[xx.flatten(),yy.flatten()]
+        locations = np.c_[xx.flatten(), yy.flatten()]
 
         for k in self.locs_home[half].keys():
             # if len(self.locs_home[half][k]) >= tp:
-            Zh += self.influence_np(k, locations, tp, 'h', half, verbose)
+            Zh += self.influence_np(k, locations, tp, "h", half, verbose)
         for k in self.locs_away[half].keys():
             # if len(self.locs_away[half][k]) >= tp:
-            Za += self.influence_np(k, locations, tp, 'a', half, verbose)
+            Za += self.influence_np(k, locations, tp, "a", half, verbose)
 
         Zh = Zh.reshape((dt, dt))
         Za = Za.reshape((dt, dt))
-        result = 1 / (1 + np.exp(-Za + Zh))
+
+        # Return raw team influence or combined logistic transformation
+        if return_teams == "home":
+            result = np.clip(Zh, 0, 1)  # home team influence only
+        elif return_teams == "away":
+            result = np.clip(Za, 0, 1)  # away team influence only
+        else:  # "both"
+            result = 1 / (1 + np.exp(-Za + Zh))  # logistic transformation
 
         return result, xx, yy
 
@@ -570,13 +651,22 @@ class PitchControl:
         device: str = "cpu",
         verbose: bool = False,
         use_fp16: bool = True,
+        return_teams: str = "both",
     ):
         """Selects NumPy or PyTorch backend depending on `backend`."""
         match backend:
             case "np" | "numpy":
-                return self._fit_np(half, tp, dt, verbose)
+                return self._fit_np(half, tp, dt, verbose, return_teams)
             case "torch" | "pt":
-                return self._fit_pt(half, tp, dt, device=device, verbose=verbose, use_fp16=use_fp16)
+                return self._fit_pt(
+                    half,
+                    tp,
+                    dt,
+                    device=device,
+                    verbose=verbose,
+                    use_fp16=use_fp16,
+                    return_teams=return_teams,
+                )
             case _:
                 raise ValueError(f"Unknown backend '{backend}'. Use 'np' or 'torch'.")
 
@@ -586,9 +676,10 @@ class PitchControl:
         dt: int = 100,
         backend: str = "np",
         device: str = "cpu",
-        batch_size: int = 30*60,
+        batch_size: int = 30 * 60,
         use_fp16: bool = True,
         verbose: bool = False,
+        return_teams: str = "both",
     ):
         """Compute pitch-control map for *каждый* кадр тайма.
 
@@ -606,7 +697,9 @@ class PitchControl:
             case "np" | "numpy":
                 pc_all = np.empty((T, dt, dt), dtype=np.float32)
                 for tp in tqdm(range(T)):
-                    pc_map, xx, yy = self._fit_np(half, tp, dt, verbose=False)
+                    pc_map, xx, yy = self._fit_np(
+                        half, tp, dt, verbose=False, return_teams=return_teams
+                    )
                     pc_all[tp] = pc_map.astype(np.float32)
                     if verbose and tp % 500 == 0:
                         print(f"np full-match: done {tp}/{T}")
@@ -614,7 +707,7 @@ class PitchControl:
 
             case "torch" | "pt":
                 return self._fit_full_pt(
-                    half, dt, device, batch_size, use_fp16, verbose
+                    half, dt, device, batch_size, use_fp16, verbose, return_teams
                 )
             case _:
                 raise ValueError("backend must be 'np' or 'pt'")
@@ -626,7 +719,7 @@ class PitchControl:
         pitch_control: tuple = None,
         save: bool = False,
         dt: int = 200,
-        filename: str = 'pitch_control'
+        filename: str = "pitch_control",
     ):
         if pitch_control is None:
             pitch_control, xx, yy = self.fit(half, tp, dt)
@@ -645,7 +738,7 @@ class PitchControl:
                 plt.scatter(
                     self.locs_home[half][k][tp, 0],
                     self.locs_home[half][k][tp, 1],
-                    color='darkgrey'
+                    color="darkgrey",
                 )
 
         for k in self.locs_away[half].keys():
@@ -653,17 +746,16 @@ class PitchControl:
             if np.isfinite(self.locs_away[half][k][tp, :]).all():
                 plt.scatter(
                     self.locs_away[half][k][tp, 0],
-                    self.locs_away[half][k][tp, 1], color='black'
+                    self.locs_away[half][k][tp, 1],
+                    color="black",
                 )
 
         plt.scatter(
-            self.locs_ball[half][tp, 0],
-            self.locs_ball[half][tp, 1],
-            color='red'
+            self.locs_ball[half][tp, 0], self.locs_ball[half][tp, 1], color="red"
         )
 
         if save:
-            plt.savefig(f'{filename}.png', dpi=300)
+            plt.savefig(f"{filename}.png", dpi=300)
         else:
             plt.show()
 
@@ -674,7 +766,7 @@ class PitchControl:
         filename: str = "pitch_control_animation",
         dt: int = 200,
         frames: int = 30,
-        interval: int = 1000
+        interval: int = 1000,
     ):
         """
         ffmpeg should be installed on your machine.
@@ -686,7 +778,7 @@ class PitchControl:
             pitch_control, xx, yy = self.fit(half, fr, dt)
 
             mpl.field("white", show=False, ax=ax)
-            ax.axis('off')
+            ax.axis("off")
 
             plt.contourf(xx, yy, pitch_control)
 
@@ -696,7 +788,7 @@ class PitchControl:
                     plt.scatter(
                         self.locs_home[half][k][fr, 0],
                         self.locs_home[half][k][fr, 1],
-                        color='darkgrey'
+                        color="darkgrey",
                     )
             for k in self.locs_away[half].keys():
                 # if len(self.locs_away[half][k]) >= fr:
@@ -704,13 +796,11 @@ class PitchControl:
                     plt.scatter(
                         self.locs_away[half][k][fr, 0],
                         self.locs_away[half][k][fr, 1],
-                        color='black'
+                        color="black",
                     )
 
             plt.scatter(
-                self.locs_ball[half][fr, 0],
-                self.locs_ball[half][fr, 1],
-                color='red'
+                self.locs_ball[half][fr, 0], self.locs_ball[half][fr, 1], color="red"
             )
 
             return ax
@@ -724,7 +814,7 @@ class PitchControl:
             func=animate,
             frames=min(frames, len(self.locs_ball[half]) - tp),
             interval=interval,
-            blit=False
+            blit=False,
         )
 
-        ani.save(f'{filename}.mp4', writer='ffmpeg')
+        ani.save(f"{filename}.mp4", writer="ffmpeg")
