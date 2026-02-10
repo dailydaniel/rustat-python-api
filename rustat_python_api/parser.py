@@ -1,22 +1,17 @@
-import requests
-import pandas as pd
-from collections import defaultdict
-from tqdm import tqdm
 import time
+from collections import defaultdict
 
-from .urls import URLs
+import pandas as pd
+import requests
+from tqdm import tqdm
+
 from .config import numeric_columns
 from .processing import processing
+from .urls import URLs
 
 
 class RuStatParser:
-    def __init__(
-        self,
-        user: str,
-        password: str,
-        urls: dict = URLs,
-        sleep: int = -1
-    ):
+    def __init__(self, user: str, password: str, urls: dict = URLs, sleep: int = -1):
         self.user = user
         self.password = password
         self.urls = urls
@@ -35,14 +30,12 @@ class RuStatParser:
     def get_season_teams(self, season_id: int):
         data = self.resp2data(
             self.urls["tournament_teams"].format(
-                user=self.user,
-                password=self.password,
-                season_id=season_id
+                user=self.user, password=self.password, season_id=season_id
             )
         )
 
         if data:
-            return data['data']['row']
+            return data["data"]["row"]
         else:
             return []
 
@@ -50,9 +43,7 @@ class RuStatParser:
         for season_id in tqdm(range(start_season, end_season)):
             data = self.resp2data(
                 self.urls["tournament_teams"].format(
-                    user=self.user,
-                    password=self.password,
-                    season_id=season_id
+                    user=self.user, password=self.password, season_id=season_id
                 )
             )
 
@@ -63,19 +54,21 @@ class RuStatParser:
                         user=self.user,
                         password=self.password,
                         team_id=first_team_id,
-                        season_id=season_id
+                        season_id=season_id,
                     )
                 )
 
                 if first_team_schedule:
                     last_match = first_team_schedule["data"]["row"][0]
-                    season_name = f'{last_match["tournament_name"]} {last_match["season_name"]}'
+                    season_name = (
+                        f"{last_match['tournament_name']} {last_match['season_name']}"
+                    )
                 else:
                     season_name = ""
 
                 self.cached_info[season_id] = {
                     "season_name": season_name,
-                    "season_teams": data["data"]["row"]
+                    "season_teams": data["data"]["row"],
                 }
 
         return self.cached_info
@@ -86,7 +79,7 @@ class RuStatParser:
                 user=self.user,
                 password=self.password,
                 team_id=team_id,
-                season_id=season_id
+                season_id=season_id,
             )
         )
 
@@ -101,23 +94,20 @@ class RuStatParser:
                 "team1_name": row["team1_name"],
                 "team2_name": row["team2_name"],
                 "round_name": (row["round_name"] if "round_name" in row else None),
-                "tournament_name": (row["tournament_name"] if "tournament_name" in row else None),
-                "season_name": (row["season_name"] if "season_name" in row else None)
+                "tournament_name": (
+                    row["tournament_name"] if "tournament_name" in row else None
+                ),
+                "season_name": (row["season_name"] if "season_name" in row else None),
             }
             for row in data["data"]["row"]
         }
 
     def get_events(
-        self,
-        match_id: int,
-        process: bool = True,
-        return_subs: bool = True
+        self, match_id: int, process: bool = True, return_subs: bool = True
     ) -> pd.DataFrame | None | tuple[pd.DataFrame, pd.DataFrame]:
         data = self.resp2data(
             self.urls["events"].format(
-                user=self.user,
-                password=self.password,
-                match_id=match_id
+                user=self.user, password=self.password, match_id=match_id
             )
         )
 
@@ -126,35 +116,48 @@ class RuStatParser:
 
         df = pd.json_normalize(data["data"]["row"])
 
-        current_numeric_columns = [column for column in numeric_columns if column in df.columns]
-        df[current_numeric_columns] = df[current_numeric_columns].apply(pd.to_numeric, errors='coerce')
+        current_numeric_columns = [
+            column for column in numeric_columns if column in df.columns
+        ]
+        df[current_numeric_columns] = df[current_numeric_columns].apply(
+            pd.to_numeric, errors="coerce"
+        )
 
         if process:
-            df['match_id'] = match_id
+            df["match_id"] = match_id
 
             if return_subs:
-                subs = df[df['action_id'] == '14000'][[
-                    'match_id', 'half', 'second',
-                    'team_id', 'team_name',
-                    'opponent_id', 'opponent_name',
-                    'player_id', 'player_name'
-                ]].rename(columns={
-                    'player_id': 'player_id_out',
-                    'opponent_id': 'player_id_in',
-                    'player_name': 'player_name_out',
-                    'opponent_name': 'player_name_in'
-                })
+                subs = df[df["action_id"] == "14000"][
+                    [
+                        "match_id",
+                        "half",
+                        "second",
+                        "team_id",
+                        "team_name",
+                        "opponent_id",
+                        "opponent_name",
+                        "player_id",
+                        "player_name",
+                    ]
+                ].rename(
+                    columns={
+                        "player_id": "player_id_out",
+                        "opponent_id": "player_id_in",
+                        "player_name": "player_name_out",
+                        "opponent_name": "player_name_in",
+                    }
+                )
 
             df = processing(df)
+
+            df["event_chron_id"] = range(1, len(df) + 1)
 
         return (df, subs) if return_subs else df
 
     def get_tracking(self, match_id: int) -> pd.DataFrame | None:
         data = self.resp2data(
             self.urls["tracking"].format(
-                user=self.user,
-                password=self.password,
-                match_id=match_id
+                user=self.user, password=self.password, match_id=match_id
             )
         )
 
@@ -162,7 +165,18 @@ class RuStatParser:
             return None
 
         data = data["data"]["team"]
-        df = pd.DataFrame(columns=["half", "second", "pos_x", "pos_y", "team_id", "player_id", "player_name", "side_1h"])
+        df = pd.DataFrame(
+            columns=[
+                "half",
+                "second",
+                "pos_x",
+                "pos_y",
+                "team_id",
+                "player_id",
+                "player_name",
+                "side_1h",
+            ]
+        )
 
         for team_data in tqdm(data):
             team_id = team_data["id"]
@@ -173,7 +187,7 @@ class RuStatParser:
                 player_name = player_data["name"]
 
                 cur_df = pd.json_normalize(player_data["row"])
-                cur_df = cur_df.apply(pd.to_numeric, errors='coerce')
+                cur_df = cur_df.apply(pd.to_numeric, errors="coerce")
                 cur_df["team_id"] = team_id
                 cur_df["player_id"] = player_id
                 cur_df["player_name"] = player_name
@@ -181,16 +195,21 @@ class RuStatParser:
 
                 df = pd.concat([df, cur_df], ignore_index=True)
 
-        df = df.sort_values(by=['half', 'second', 'team_id', 'player_id']).reset_index(drop=True)
-        df['pos_x'] = df['pos_x'] + 105/2
-        df['second'] = df['second'].astype(int)
+        df = df.sort_values(by=["half", "second", "team_id", "player_id"]).reset_index(
+            drop=True
+        )
+        df["pos_x"] = df["pos_x"] + 105 / 2
+        df["second"] = df["second"].astype(int)
 
         return df
 
     def get_tracking_30fps(
         self,
-        match_id: int, half: int, lang_id: int = 1,
-        referee_data: int = 0, ball_data: int = 1
+        match_id: int,
+        half: int,
+        lang_id: int = 1,
+        referee_data: int = 0,
+        ball_data: int = 1,
     ) -> pd.DataFrame | tuple | None:
         data = self.resp2data(
             self.urls["tracking_30fps"].format(
@@ -200,23 +219,33 @@ class RuStatParser:
                 half=half,
                 lang_id=lang_id,
                 referee_data=referee_data,
-                ball_data=ball_data
+                ball_data=ball_data,
             )
         )
 
         if not data:
             return None
 
-        teams_data = data['data']['teams']
-        if 'ball' in data['data']:
-            ball_data = data['data']['ball']
-        if 'referee' in data['data']:
-            referee_data = data['data']['referee']
+        teams_data = data["data"]["teams"]
+        if "ball" in data["data"]:
+            ball_data = data["data"]["ball"]
+        if "referee" in data["data"]:
+            referee_data = data["data"]["referee"]
         del data
 
-        tracking = pd.DataFrame(columns=[
-            "half", "second", "pos_x", "pos_y", "team_id", "player_id", "player_name", "distance", "speed"
-        ])
+        tracking = pd.DataFrame(
+            columns=[
+                "half",
+                "second",
+                "pos_x",
+                "pos_y",
+                "team_id",
+                "player_id",
+                "player_name",
+                "distance",
+                "speed",
+            ]
+        )
 
         for team_data in tqdm(teams_data):
             team_id = team_data["id"]
@@ -227,7 +256,7 @@ class RuStatParser:
                 player_name = player_data["name"]
 
                 cur_df = pd.json_normalize(player_data["rows"])
-                cur_df = cur_df.apply(pd.to_numeric, errors='coerce')
+                cur_df = cur_df.apply(pd.to_numeric, errors="coerce")
                 cur_df["team_id"] = team_id
                 cur_df["player_id"] = player_id
                 cur_df["player_name"] = player_name
@@ -235,22 +264,24 @@ class RuStatParser:
 
                 tracking = pd.concat([tracking, cur_df], ignore_index=True)
 
-        tracking['second'] = tracking['second'].astype(float)
-        tracking = tracking.sort_values(by=['half', 'second', 'team_id', 'player_id']).reset_index(drop=True)
-        tracking['pos_x'] = tracking['pos_x'] + 105/2
-        tracking['team_id'] = tracking['team_id'].astype(str)
+        tracking["second"] = tracking["second"].astype(float)
+        tracking = tracking.sort_values(
+            by=["half", "second", "team_id", "player_id"]
+        ).reset_index(drop=True)
+        tracking["pos_x"] = tracking["pos_x"] + 105 / 2
+        tracking["team_id"] = tracking["team_id"].astype(str)
 
         if referee_data:
-            referee = pd.json_normalize(referee_data['rows'])
-            referee['second'] = referee['second'].astype(float)
-            referee = referee.sort_values(by=['half', 'second']).reset_index(drop=True)
-            referee['pos_x'] = referee['pos_x'] + 105/2
+            referee = pd.json_normalize(referee_data["rows"])
+            referee["second"] = referee["second"].astype(float)
+            referee = referee.sort_values(by=["half", "second"]).reset_index(drop=True)
+            referee["pos_x"] = referee["pos_x"] + 105 / 2
 
         if ball_data:
-            ball = pd.json_normalize(ball_data['rows'])
-            ball['second'] = ball['second'].astype(float)
-            ball = ball.sort_values(by=['half', 'second']).reset_index(drop=True)
-            ball['pos_x'] = ball['pos_x'] + 105/2
+            ball = pd.json_normalize(ball_data["rows"])
+            ball["second"] = ball["second"].astype(float)
+            ball = ball.sort_values(by=["half", "second"]).reset_index(drop=True)
+            ball["pos_x"] = ball["pos_x"] + 105 / 2
 
         if referee_data and ball_data:
             return tracking, referee, ball
@@ -264,9 +295,7 @@ class RuStatParser:
     def get_match_stats(self, match_id: int) -> dict:
         data = self.resp2data(
             self.urls["match_stats"].format(
-                user=self.user,
-                password=self.password,
-                match_id=match_id
+                user=self.user, password=self.password, match_id=match_id
             )
         )
 
@@ -275,11 +304,11 @@ class RuStatParser:
 
         stats = defaultdict(dict)
 
-        for row in data['data']['row']:
-            team_id = int(row['team_id'])
-            param_name = row['param_name']
+        for row in data["data"]["row"]:
+            team_id = int(row["team_id"])
+            param_name = row["param_name"]
 
-            param_value = float(row['value'])
+            param_value = float(row["value"])
 
             stats[param_name][team_id] = param_value
 
@@ -288,16 +317,14 @@ class RuStatParser:
     def get_players_match_stats(self, match_id: int) -> dict:
         data = self.resp2data(
             self.urls["player_match_stats"].format(
-                user=self.user,
-                password=self.password,
-                match_id=match_id
+                user=self.user, password=self.password, match_id=match_id
             )
         )
 
         if not data:
             return {}
 
-        return data['data']['team']
+        return data["data"]["team"]
 
     def get_players_minutes_in_match(self, match_id: int) -> dict:
         data = self.get_players_match_stats(match_id)
@@ -308,10 +335,14 @@ class RuStatParser:
         players_minutes = {}
 
         for team_data in data:
-            for player_data in team_data['player']:
-                player_id = int(player_data['id'])
+            for player_data in team_data["player"]:
+                player_id = int(player_data["id"])
 
-                minutes = [float(metric['value']) for metric in player_data['param'] if metric['id'] == '288']
+                minutes = [
+                    float(metric["value"])
+                    for metric in player_data["param"]
+                    if metric["id"] == "288"
+                ]
                 minutes = minutes[0] if minutes else 0
 
                 players_minutes[player_id] = minutes
