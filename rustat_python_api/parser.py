@@ -150,8 +150,6 @@ class RuStatParser:
 
             df = processing(df)
 
-            df["event_chron_id"] = range(1, len(df) + 1)
-
         return (df, subs) if return_subs else df
 
     def get_tracking(self, match_id: int) -> pd.DataFrame | None:
