@@ -597,6 +597,8 @@ class PitchControl:
         verbose: bool = False,
         use_fp16: bool = True,
         return_teams: str = "both",
+        include_players: list | None = None,
+        exclude_players: list | None = None,
     ):
         """Torch-accelerated pitch-control calculation.
 
@@ -621,12 +623,16 @@ class PitchControl:
         else:
             xx_t, yy_t, locs_t = self._grid_cache[key]
 
+        # --- filter players ---
+        home_dict = self._filter_players(self.locs_home[half], include_players, exclude_players)
+        away_dict = self._filter_players(self.locs_away[half], include_players, exclude_players)
+
         # --- vectorised influence computation ---
         Zh = self._batch_influence_pt(
-            self.locs_home[half], locs_t, tp, half, device, dtype
+            home_dict, locs_t, tp, half, device, dtype
         )
         Za = self._batch_influence_pt(
-            self.locs_away[half], locs_t, tp, half, device, dtype
+            away_dict, locs_t, tp, half, device, dtype
         )
 
         # Return raw team influence or combined logistic transformation
@@ -640,6 +646,14 @@ class PitchControl:
         # Convert to numpy for downstream plotting
         return res_t.cpu().numpy(), xx_t.cpu().numpy(), yy_t.cpu().numpy()
 
+    @staticmethod
+    def _filter_players(player_dict, include_players=None, exclude_players=None):
+        if include_players is not None:
+            player_dict = {k: v for k, v in player_dict.items() if k in include_players}
+        if exclude_players is not None:
+            player_dict = {k: v for k, v in player_dict.items() if k not in exclude_players}
+        return player_dict
+
     def _fit_np(
         self,
         half: int,
@@ -647,6 +661,8 @@ class PitchControl:
         dt: int,
         verbose: bool = False,
         return_teams: str = "both",
+        include_players: list | None = None,
+        exclude_players: list | None = None,
     ) -> tuple:
         x = np.linspace(0, 105, dt)
         y = np.linspace(0, 68, dt)
@@ -657,11 +673,12 @@ class PitchControl:
 
         locations = np.c_[xx.flatten(), yy.flatten()]
 
-        for k in self.locs_home[half].keys():
-            # if len(self.locs_home[half][k]) >= tp:
+        home_dict = self._filter_players(self.locs_home[half], include_players, exclude_players)
+        away_dict = self._filter_players(self.locs_away[half], include_players, exclude_players)
+
+        for k in home_dict.keys():
             Zh += self.influence_np(k, locations, tp, "h", half, verbose)
-        for k in self.locs_away[half].keys():
-            # if len(self.locs_away[half][k]) >= tp:
+        for k in away_dict.keys():
             Za += self.influence_np(k, locations, tp, "a", half, verbose)
 
         Zh = Zh.reshape((dt, dt))
@@ -687,11 +704,24 @@ class PitchControl:
         verbose: bool = False,
         use_fp16: bool = True,
         return_teams: str = "both",
+        include_players: list | None = None,
+        exclude_players: list | None = None,
     ):
-        """Selects NumPy or PyTorch backend depending on `backend`."""
+        """Selects NumPy or PyTorch backend depending on `backend`.
+
+        Parameters
+        ----------
+        include_players : list of player_ids, optional
+            If provided, only these players are included in the computation.
+        exclude_players : list of player_ids, optional
+            If provided, these players are excluded from the computation.
+        """
         match backend:
             case "np" | "numpy":
-                return self._fit_np(half, tp, dt, verbose, return_teams)
+                return self._fit_np(
+                    half, tp, dt, verbose, return_teams,
+                    include_players, exclude_players,
+                )
             case "torch" | "pt":
                 return self._fit_pt(
                     half,
@@ -701,6 +731,8 @@ class PitchControl:
                     verbose=verbose,
                     use_fp16=use_fp16,
                     return_teams=return_teams,
+                    include_players=include_players,
+                    exclude_players=exclude_players,
                 )
             case _:
                 raise ValueError(f"Unknown backend '{backend}'. Use 'np' or 'torch'.")
