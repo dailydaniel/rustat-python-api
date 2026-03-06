@@ -461,14 +461,6 @@ class PitchControl:
         else:
             Sigma_inv = torch.linalg.inv(Sigma + eye)
 
-        # Mask out invalid players by zeroing their Sigma_inv
-        # This ensures their influence contribution is exactly 0
-        Sigma_inv = torch.where(
-            valid_mask.unsqueeze(-1).unsqueeze(-1),  # (F,P,1,1)
-            Sigma_inv,
-            torch.zeros_like(Sigma_inv),
-        )
-
         mu = pos_t_clean + 0.5 * sxy  # (F,P,2)
 
         diff = locs.view(1, 1, -1, 2)  # (1,1,N,2)
@@ -482,6 +474,13 @@ class PitchControl:
             maha = torch.einsum("fpni,fpij,fpnj->fpn", diff, Sigma_inv, diff)  # (F,P,N)
             maha = torch.nan_to_num(maha, nan=1e9, posinf=1e9, neginf=1e9)
             out = torch.exp(-0.5 * maha)  # (F,P,N)
+
+            # Zero out invalid players (exp(0)=1 would inflate influence)
+            out = torch.where(
+                valid_mask.unsqueeze(-1),  # (F,P,1)
+                out,
+                torch.zeros_like(out),
+            )
 
             return out.sum(dim=1)  # sum over players
 

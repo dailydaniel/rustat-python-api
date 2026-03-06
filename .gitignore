@@ -6,3 +6,4 @@ build/
 dist/
 rustat_python_api.egg-info/
 rustat_python_api/__pycache__/
+rustat_python_api/kernels/__pycache__/
